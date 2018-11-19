@@ -3,19 +3,33 @@ import * as esprima from 'esprima';
 const parseCode = (codeToParse) => {
 	//information to save about each expr
 	//Line	Type	Name	Condition	Value
-	var toParse = esprima.parseScript(codeToParse,{loc: true});
-	parseProgram(toParse);
-	console.log(lst);
-	//console.log(JSON.stringify(toParse, null, 2));
-    return toParse;
+	try{
+		var toParse = esprima.parseScript(codeToParse,{loc: true});
+		parseProgram(toParse);
+		console.log(lst);
+		//console.log(JSON.stringify(toParse, null, 2));
+		toParse = esprima.parseScript(codeToParse);
+	    return toParse;
+	}
+	catch(err){
+		return "illegal syntex " + err;
+	}
 };
 
-var lst = [];
+var lst;
+function parsedList(){
+	return lst;
+}
 
 function parseProgram(toParse) {
-	if(toParse == null) return null;
-	var type = toParse.type;
-	return type == "Program" ? parseExps(toParse.body) : null;
+	if(toParse != null){
+		lst = [];
+		var type = toParse.type;
+		if(type == "Program") 
+			parseExps(toParse.body);
+		else			
+			console.log("Doesn't know how to parse something that is not program!");
+	}
 }
 
 function parseLiterals(toParse) {
@@ -23,17 +37,23 @@ function parseLiterals(toParse) {
 	var type = toParse.type;
 	return type == "Literal" ? parseLitetral(toParse) : 
 		type == "BinaryExpression" ? parseBinaryExpression(toParse) :
-			type == "UnaryExpression" ? parseUnaryExpression(toParse) :
-				type == "Identifier" ? parseIdentifier(toParse) : 
-					type == "UpdateExpression" ? parseUnaryExpression(toParse.right) : null;	
+			type == "LogicalExpression" ? parseBinaryExpression(toParse) : 
+				type == "UnaryExpression" ? parseUnaryExpression(toParse) :
+					type == "UpdateExpression" ? parseUnaryExpression(toParse) :
+						type == "Identifier" ? parseIdentifier(toParse) : 						
+							type == "MemberExpression" ? parseMemberExpression(toParse) : null;	
 }
 
 function parseLitetral(toParse) {
 	return toParse.value;
 }
 
+function parseMemberExpression(toParse){
+	return toParse.object.name + "[" + parseLiterals(toParse.property) + "]";
+}
+
 function parseBinaryExpression(toParse) {
-	return parseLiterals(toParse.left) + " " + toParse.operator + " " + parseLiterals(toParse.right);
+	return "(" + parseLiterals(toParse.left) + " " + toParse.operator + " " + parseLiterals(toParse.right) + ")";
 }
 
 function parseUnaryExpression(toParse) {
@@ -46,15 +66,25 @@ function parseIdentifier(toParse) {
 }
 
 function parseExp(toParse) {
-	if(toParse == null) return null;
-	var type = toParse.type;
-	type == "FunctionDeclaration" ? parseFunctionDeclaration(toParse) : 
-		type == "VariableDeclaration" ? parseVariableDeclaration(toParse) :
-			type == "ExpressionStatement" ? parseExpressionStatement(toParse) :
-				type == "ForStatement" ? parseForStatement(toParse) :
-					type == "WhileStatement" ? parseWhileStatement(toParse) :
-						type == "IfStatement" ? parseIfStatementn(toParse) :
-							type == "ReturnStatement" ? parseReturnStatement(toParse) : null;	
+	if(toParse != null){
+		var type = toParse.type;
+			type == "FunctionDeclaration" ? parseFunctionDeclaration(toParse) : 
+				type == "VariableDeclaration" ? parseVariableDeclaration(toParse) :
+					type == "ExpressionStatement" ? parseExpressionStatement(toParse.expression) :
+						type == "ForStatement" ? parseForStatement(toParse) :
+							type == "WhileStatement" ? parseWhileStatement(toParse) :
+								type == "IfStatement" ? parseIfStatementn(toParse) :
+									type == "ReturnStatement" ? parseReturnStatement(toParse) : null;
+	}
+}
+
+function parseCallExpression(toParse) {
+	insertValueToList(toParse.loc, "call expression", toParse.callee.name, null, null);
+	toParse.arguments.forEach(parseArg);;
+}
+
+function parseArg(toParse) {
+	insertValueToList(toParse.loc, "callee argument", null, null, parseLiterals(toParse));
 }
 
 function parseFunctionDeclaration(toParse) {
@@ -78,12 +108,14 @@ function parseVariableDeclarator(toParse) {
 
 
 function parseExpressionStatement(toParse) {
-	toParse = toParse.expression;
+	//toParse = toParse.expression;
 	var type = toParse.type;
-	if(type == "AssignmentExpression")
-		insertValueToList(toParse.left.loc, "assignment expression", toParse.left.name, null, parseLiterals(toParse.right));
+	if(type == "CallExpression")
+		parseCallExpression(toParse)
+	else if(type == "AssignmentExpression")
+		insertValueToList(toParse.loc, "assignment expression", toParse.left.name, null, parseLiterals(toParse.right));
 	else if(type == "UpdateExpression")
-		insertValueToList(toParse.right.loc, "update expression", null, null, parseUnaryExpression(toParse.right));
+		insertValueToList(toParse.loc, "update expression", null, null, parseUnaryExpression(toParse));
 }
 
 
@@ -109,13 +141,16 @@ function parseIfStatementn(toParse) {
 //give the opportunity to parse multiple else if as 'else if statement'
 function parseElseIfStatementn(toParse) {
 	parseBody(toParse.consequent);
-	if(toParse.alternate.type == "IfStatement")	{
-		insertValueToList(toParse.loc, "else if statement", null, parseLiterals(toParse.test), null);
-		parseElseIfStatementn(toParse.alternate)
-	}
-	else {
-		insertValueToList(toParse.loc, "else statement", null, null, null);
-		parseBody(toParse.alternate);
+	toParse = toParse.alternate;
+	if(toParse != null){
+		if(toParse.type == "IfStatement")	{
+			insertValueToList(toParse.loc, "else if statement", null, parseLiterals(toParse.test), null);
+			parseElseIfStatementn(toParse)
+		}
+		else {
+			insertValueToList(toParse.loc, "else statement", null, null, null);
+			parseBody(toParse);
+		}
 	}
 }
 
@@ -132,14 +167,15 @@ function parseExps(toParse) {
 }
 
 function parseBody(toParse) {
-	if(toParse == null) return null;
-	var type = toParse.type;
-	type == "BlockStatement" ? parseExps(toParse.body) : 
+	if(toParse != null){
+		var type = toParse.type;
+		type == "BlockStatement" ? parseExps(toParse.body) : 
 		parseExp(toParse);
+	}
 }
 
 function insertValueToList(line, Type, Name, Condition, Value) {
 	lst.push({line:line.start.line, type:Type, name:Name, condition:Condition, value:Value});
 }
 
-export {parseCode};
+export {parseCode, parsedList, parseProgram};
