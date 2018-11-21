@@ -1,11 +1,11 @@
 import $ from 'jquery';
 import {parseCode, parsedList} from './code-analyzer';
 
-var table = document.getElementById("parsed_table");
+var table = document.getElementById('parsed_table');
 function make_table(lst) {
-	//lst.forEach(make_row_element);
-	table.innerHTML = "";
-	lst.forEach(make_row_element);
+    //lst.forEach(make_row_element);
+    table.innerHTML = '';
+    lst.forEach(make_row_element);
 }
 
 function make_row_element(line_obj) {
@@ -20,7 +20,7 @@ function make_row_element(line_obj) {
     Name.innerHTML = line_obj.name;
     Condition.innerHTML = line_obj.condition;
     Value.innerHTML = line_obj.value;
-	//Line	Type	Name	Condition	Value
+    //Line    Type    Name    Condition    Value
 }
 
 $(document).ready(function () {
