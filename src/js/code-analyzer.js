@@ -3,17 +3,12 @@ import * as esprima from 'esprima';
 const parseCode = (codeToParse) => {
     //information to save about each expr
     //Line    Type    Name    Condition    Value
-    try{
-        var toParse = esprima.parseScript(codeToParse,{loc: true});
+    var toParse = esprima.parseScript(codeToParse,{loc: true});
         parseProgram(toParse);
         //console.log(lst);
         //console.log(JSON.stringify(toParse, null, 2));
-        toParse = esprima.parseScript(codeToParse);
+        //toParse = esprima.parseScript(codeToParse);
         return toParse;
-    }
-    catch(err){
-        return 'illegal syntex ' + err;
-    }
 };
 
 var lst = [];
@@ -53,8 +48,15 @@ function parseLitetral(toParse) {
     return toParse.value;
 }
 
-function parseMemberExpression(toParse){
-    return toParse.object.name + '[' + (toParse.property.name) + ']';
+function get_name(obj){
+	var name;
+	if(obj.type != null) name = parseLiterals(obj);
+	else name = obj.name;
+	return name;
+}
+
+function parseMemberExpression(toParse){	
+    return toParse.object.name + '[' + get_name(toParse.property) + ']';
 }
 
 function parseBinaryExpression(toParse) {
@@ -129,16 +131,17 @@ function parseExpressionStatement(toParse) {
     var type = toParse.type;
     if(type == 'CallExpression')
         parseCallExpression(toParse);
-    else if(type == 'AssignmentExpression')
-        insertValueToList(toParse.loc, 'assignment expression', toParse.left.name, null, parseLiterals(toParse.right));
+    else if(type == 'AssignmentExpression') {
+        insertValueToList(toParse.loc, 'assignment expression', get_name(toParse.left), null, parseLiterals(toParse.right));
+	}
     else    insertValueToList(toParse.loc, changeToSpacedLoweCase(toParse.type), null, null, parseLiterals(toParse));
 }
 
 
 function parseForStatement(toParse) {
     insertValueToList(toParse.loc, 'for statement', null, parseLiterals(toParse.test), null);
-    parseExpressionStatement(toParse.init);
-    parseExpressionStatement(toParse.update);
+    parseExp(toParse.init);
+    parseExp(toParse.update);
     parseBody(toParse.body);
 }
 
