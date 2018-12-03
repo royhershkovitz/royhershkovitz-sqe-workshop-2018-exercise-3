@@ -5,19 +5,20 @@ const parseCode = (codeToParse) => {
     //Line    Type    Name    Condition    Value
     var toParse = esprima.parseScript(codeToParse,{loc: true});
         parseProgram(toParse);
-        //console.log(lst);
+        //console.log(current_scope);
         //console.log(JSON.stringify(toParse, null, 2));
-        //toParse = esprima.parseScript(codeToParse);
+        toParse = esprima.parseScript(codeToParse);
         return toParse;
 };
 
-var lst = [];
+var current_scope = [];
+var scopes = [];
 function parsedList(){
-    return lst;
+    return current_scope.slice(0);
 }
 
 function parseProgram(toParse) {
-    lst = [];
+    current_scope = [];
     var type = toParse.type;
     //console.log(JSON.stringify(toParse, null, 2));
     if(type == 'Program') 
@@ -26,8 +27,14 @@ function parseProgram(toParse) {
     //    console.log('Doesn\'t know how to parse something that is not program!');
 }
 
-
+let is_first_binary_ex = true;
 function parseLiterals(toParse) {
+    let last_is_first_binary_ex = is_first_binary_ex;
+    let out = parseLiteralsHelper(toParse);
+    is_first_binary_ex = last_is_first_binary_ex;
+    return out;
+}
+function parseLiteralsHelper(toParse) {
     if(toParse == null) return null;
     var type = toParse.type;
     return type == 'Identifier' ? parseIdentifier(toParse) :
@@ -60,7 +67,10 @@ function parseMemberExpression(toParse){
 }
 
 function parseBinaryExpression(toParse) {
-    return '(' + parseLiterals(toParse.left) + ' ' + toParse.operator + ' ' + parseLiterals(toParse.right) + ')';
+    if(!is_first_binary_ex)
+        return '(' + parseLiterals(toParse.left) + ' ' + toParse.operator + ' ' + parseLiterals(toParse.right)  + ')';    
+    is_first_binary_ex = false;
+    return parseLiterals(toParse.left) + ' ' + toParse.operator + ' ' + parseLiterals(toParse.right);;
 }
 
 function parseUnaryExpression(toParse) {
@@ -96,10 +106,13 @@ function parseArg(toParse) {
     insertValueToList(toParse.loc, 'callee argument', null, null, parseLiterals(toParse));
 }
 
-function parseFunctionDeclaration(toParse) {
-    insertValueToList(toParse.loc, 'function declaration', toParse.id.name, null, null);
-    toParse.params.forEach(parseParam);
-    parseBody(toParse.body);
+function parseFunctionDeclaration(toParse) {    
+    let body = parseBody(toParse.body);
+    let params = extendScopeForFunction(() => 
+    {
+        toParse.params.forEach(parseParam);
+    });
+    insertFunctionToList(toParse.loc, 'function declaration', toParse.id.name, params, body);
 }
 
 function parseParam(toParse) {
@@ -139,36 +152,41 @@ function parseExpressionStatement(toParse) {
 
 
 function parseForStatement(toParse) {
-    insertValueToList(toParse.loc, 'for statement', null, parseLiterals(toParse.test), null);
-    parseExp(toParse.init);
-    parseExp(toParse.update);
-    parseBody(toParse.body);
+    let body = parseBody(toParse.body);        
+    let vars_array = extendScopeForFunction(() =>     {        parseExp(toParse.init);    });
+    let update_ex = toParse.update;
+    if(update_ex.type == 'AssignmentExpression')
+        update_ex = {line:update_ex.loc.start.line, type:'assignment expression', name:get_name(update_ex.left), condition:null, value:parseLiterals(update_ex.right)};
+    else
+        update_ex =  {line:toParse.update.loc.start.line, type:'update expression', value:parseLiterals(toParse.update)};
+    insertForLoopToList(toParse.loc, 'for statement', vars_array,  parseLiterals(toParse.test),  update_ex, body) 
 }
 
 
-function parseWhileStatement(toParse) {
-    insertValueToList(toParse.loc, 'while statement', null, parseLiterals(toParse.test), null);
-    parseBody(toParse.body);
+function parseWhileStatement(toParse) {    
+    let body = parseBody(toParse.body);
+    insertValueToList(toParse.loc, 'while statement', null, parseLiterals(toParse.test), null, body);
 }
 
 
 function parseIfStatementn(toParse) {
-    insertValueToList(toParse.loc, 'if statement', null, parseLiterals(toParse.test), null);
-    parseElseIfStatementn(toParse);
+    let body = parseBody(toParse.consequent);
+    insertValueToList(toParse.loc, 'if statement', null, parseLiterals(toParse.test), null, body);
+    parseElseIfStatement(toParse);
 }
 
 //give the opportunity to parse multiple else if as 'else if statement'
-function parseElseIfStatementn(toParse) {
-    parseBody(toParse.consequent);
+function parseElseIfStatement(toParse) {
     toParse = toParse.alternate;
     if(toParse != null){
-        if(toParse.type == 'IfStatement')    {
-            insertValueToList(toParse.loc, 'else if statement', null, parseLiterals(toParse.test), null);
-            parseElseIfStatementn(toParse);
+        if(toParse.type == 'IfStatement')  {
+            let body = parseBody(toParse.consequent);
+            insertValueToList(toParse.loc, 'else if statement', null, parseLiterals(toParse.test), null, body);
+            parseElseIfStatement(toParse);
         }
         else {
-            insertValueToList(toParse.loc, 'else statement', null, null, null);
-            parseBody(toParse);
+            let body = parseBody(toParse);
+            insertValueToList(toParse.loc, 'else statement', null, null, null, body);
         }
     }
 }
@@ -182,17 +200,46 @@ function parseReturnStatement(toParse) {
 //get list of exp
 function parseExps(toParse) {
     toParse.forEach(parseExp);
-    return lst;
+    return current_scope;
+}
+
+function extendScopeForFunction(func){
+    scopes.push(current_scope);
+    current_scope = [];
+    
+    func();
+        
+    let body = current_scope;
+    current_scope = scopes.pop();
+
+    return body;
+    
 }
 
 function parseBody(toParse) {
-    var type = toParse.type;
-    type == 'BlockStatement' ? parseExps(toParse.body) : 
-        parseExp(toParse);
+    return extendScopeForFunction(() => 
+    {
+        var type = toParse.type;
+        type == 'BlockStatement' ?
+            parseExps(toParse.body) :
+                parseExp(toParse);
+    });
 }
 
 function insertValueToList(line, Type, Name, Condition, Value) {
-    lst.push({line:line.start.line, type:Type, name:Name, condition:Condition, value:Value});
+    current_scope.push({line:line.start.line, type:Type, name:Name, condition:Condition, value:Value});
+}
+
+function insertFunctionToList(line, Type, Name, params, body) {
+    current_scope.push({line:line.start.line, type:Type, name:Name, params:params, body:body});
+}
+
+function insertForLoopToList(line, Type, VarDecl, Condition, Update, body) {
+    current_scope.push({line:line.start.line, type:Type, var:VarDecl, condition:Condition, update:Update, body:body});
+}
+
+function insertValueToList(line, Type, Name, Condition, Value, body) {
+    current_scope.push({line:line.start.line, type:Type, name:Name, condition:Condition, value:Value, body:body});
 }
 
 export {parseCode, parsedList, parseProgram};

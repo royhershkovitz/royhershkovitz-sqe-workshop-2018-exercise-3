@@ -7,6 +7,7 @@ $(document).ready(function () {
         let codeToParse = $('#codePlaceholder').val();
         let parsedCode = parseCode(codeToParse);        
         console.log(parsedList());
-        $('#parsedCode').val(JSON.stringify(parsedCode));//to_code(parsedList()));
+        $('#parsedCode').val(to_code(parsedList()));
+        //$('#parsedCode').val(JSON.stringify(parsedCode));
     });
 });
