@@ -41,7 +41,7 @@ function unparse_call_expression(code_array) {
     //toParse.arguments.forEach(parseArg);
     if(code_array[0].type == 'call expression'){
         let current = code_array.shift();
-        return current.name + '(' + unparse_args(code_array)  + ')';  
+        return current.name + '(' + unparse_args(current.params)  + ');';  
     }
     return '';
 }

@@ -40,7 +40,8 @@ function parseLiteralsHelper(toParse) {
     return type == 'Identifier' ? parseIdentifier(toParse) :
         type == 'Literal' ? parseLitetral(toParse) : 
             type == 'BinaryExpression' ? parseBinaryExpression(toParse) :
-                parseComplecatedLiteral(toParse);
+                type == 'CallExpression' ? parseCallExpressionLit(toParse) :
+                    parseComplecatedLiteral(toParse);
 }
 
 function parseComplecatedLiteral(toParse){
@@ -98,8 +99,38 @@ function parseLoops(toParse){
 }
 
 function parseCallExpression(toParse) {
-    insertValueToList(toParse.loc, 'call expression', toParse.callee.name, null, null);
-    toParse.arguments.forEach(parseArg);
+    let params = extendScopeForFunction(() => 
+    {
+        toParse.arguments.forEach(parseArg);
+    });
+    insertFunctionToList(toParse.loc, 'call expression', toParse.callee.name, params, null);
+}
+
+function unparse_args(code_array) {
+    //insertValueToList(toParse.loc, 'callee argument', null, null, parseLiterals(toParse));
+    if(code_array.length == 0)
+        return '';
+    else if(code_array[0].type == 'callee argument')
+        return code_array.shift().value + unparse_args_comma(code_array);    
+    return '';
+}
+
+function unparse_args_comma(code_array) {
+    //insertValueToList(toParse.loc, 'callee argument', null, null, parseLiterals(toParse));
+    if(code_array.length == 0)
+        return '';
+    else if(code_array[0].type == 'callee argument')
+        return ', ' + code_array.shift().value + unparse_args_comma(code_array);
+    return '';
+}
+
+function parseCallExpressionLit(toParse) {
+    let params = extendScopeForFunction(() => 
+    {
+        toParse.arguments.forEach(parseArg);
+    });
+    params.toString();
+    return toParse.callee.name+'(' + unparse_args(params) + ')';
 }
 
 function parseArg(toParse) {
