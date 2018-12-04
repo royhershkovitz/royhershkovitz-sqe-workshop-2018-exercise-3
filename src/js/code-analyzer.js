@@ -1,5 +1,7 @@
 import * as esprima from 'esprima';
 
+export {parseCode, parsedList, parseProgram};
+
 const parseCode = (codeToParse) => {
     //information to save about each expr
     //Line    Type    Name    Condition    Value
@@ -258,19 +260,17 @@ function parseBody(toParse) {
 }
 
 function insertValueToList(line, Type, Name, Condition, Value) {
-    current_scope.push({line:line.start.line, type:Type, name:Name, condition:Condition, value:Value});
+    current_scope.push({line:line.start.line, type:Type, name:Name, condition:Condition, value:Value, color: null});
 }
 
 function insertFunctionToList(line, Type, Name, params, body) {
-    current_scope.push({line:line.start.line, type:Type, name:Name, params:params, body:body});
+    current_scope.push({line:line.start.line, type:Type, name:Name, params:params, body:body, color: null});
 }
 
 function insertForLoopToList(line, Type, VarDecl, Condition, Update, body) {
-    current_scope.push({line:line.start.line, type:Type, var:VarDecl, condition:Condition, update:Update, body:body});
+    current_scope.push({line:line.start.line, type:Type, var:VarDecl, condition:Condition, update:Update, body:body, color: null});
 }
 
 function insertValueToList(line, Type, Name, Condition, Value, body) {
-    current_scope.push({line:line.start.line, type:Type, name:Name, condition:Condition, value:Value, body:body});
+    current_scope.push({line:line.start.line, type:Type, name:Name, condition:Condition, value:Value, body:body, color: null});
 }
-
-export {parseCode, parsedList, parseProgram};
