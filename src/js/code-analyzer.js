@@ -1,6 +1,6 @@
 import * as esprima from 'esprima';
 
-export {parseCode, parsedList, parseProgram};
+export {parseCode, parsedList, parseLiterals, parseProgram};
 
 const parseCode = (codeToParse) => {
     //information to save about each expr
@@ -15,8 +15,16 @@ const parseCode = (codeToParse) => {
 
 var current_scope = [];
 var scopes = [];
+function clone_JSON_ARRAY(frame){
+    let i = 0, new_scope = [];
+    while(i < frame.length){
+        new_scope.push(JSON.parse(JSON.stringify(frame[i])));
+        i = i + 1;
+    }
+    return new_scope;
+}
 function parsedList(){
-    return current_scope.slice(0);
+    return clone_JSON_ARRAY(current_scope);
 }
 
 function parseProgram(toParse) {
@@ -29,14 +37,7 @@ function parseProgram(toParse) {
     //    console.log('Doesn\'t know how to parse something that is not program!');
 }
 
-let is_first_binary_ex = true;
-function parseLiterals(toParse) {
-    let last_is_first_binary_ex = is_first_binary_ex;
-    let out = parseLiteralsHelper(toParse);
-    is_first_binary_ex = last_is_first_binary_ex;
-    return out;
-}
-function parseLiteralsHelper(toParse) {
+function parseLiterals(toParse) {    
     if(toParse == null) return null;
     var type = toParse.type;
     return type == 'Identifier' ? parseIdentifier(toParse) :
@@ -51,7 +52,8 @@ function parseComplecatedLiteral(toParse){
     return type == 'LogicalExpression' ? parseBinaryExpression(toParse) : 
         type == 'UnaryExpression' ? parseUnaryExpression(toParse) :
             type == 'UpdateExpression' ? parseUnaryExpression(toParse) :                                     
-                type == 'MemberExpression' ? parseMemberExpression(toParse) : null;    
+                type == 'MemberExpression' ? parseMemberExpression(toParse) :
+                    type == "ArrayExpression" ? toParse.elements.map(parseLiterals) : null;    
 }
 
 function parseLitetral(toParse) {
@@ -69,11 +71,17 @@ function parseMemberExpression(toParse){
     return toParse.object.name + '[' + get_name(toParse.property) + ']';
 }
 
-function parseBinaryExpression(toParse) {
-    if(!is_first_binary_ex)
-        return '(' + parseLiterals(toParse.left) + ' ' + toParse.operator + ' ' + parseLiterals(toParse.right)  + ')';    
-    is_first_binary_ex = false;
-    return parseLiterals(toParse.left) + ' ' + toParse.operator + ' ' + parseLiterals(toParse.right);;
+let paren_unimportant = ['+', '<', '>', '<=', '>='];
+function parseBinaryExpression(toParse) {    
+    let left_side =  parseLiterals(toParse.left);
+    let right_side =  parseLiterals(toParse.right);
+    if(!paren_unimportant.includes(toParse.operator)){        
+        if(toParse.left.type == 'BinaryExpression')
+            left_side = '(' + left_side + ')';
+        if(toParse.right.type == 'BinaryExpression')
+            right_side = '(' + right_side + ')';
+    }
+    return left_side + ' ' + toParse.operator + ' ' + right_side;
 }
 
 function parseUnaryExpression(toParse) {

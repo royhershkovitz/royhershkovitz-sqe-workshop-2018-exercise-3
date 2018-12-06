@@ -1,4 +1,3 @@
-
 export {to_code};
 
 let last_line;
@@ -7,12 +6,9 @@ let parsers = [line_num, unparse_call_expression, unparse_assignment_expression,
     unparse_while_statement, unparse_function_declaration, unparse_variable_declaration, unparse_for_statement ];
 function to_code(code_array){
     last_line = 1;
-    let to_run = true, last_arr = null, output = '';
-    while(to_run && code_array.length != 0){
-        if(last_arr == code_array)
-            run = false;//struck
-        output = output + try_all_parsers(parsers, code_array);
-    }
+    let to_run = true, last_arr = null, last_len = 0, output = '';
+    while(to_run && code_array.length != 0)
+        output = output + try_all_parsers(parsers, code_array);    
     return output;
 }
 
@@ -90,13 +86,15 @@ function unparse_body(body) {
     return '\n' + tabs + '{' +  body + '\n' + tabs + '}';
 }
 
-//todo retrive multiple let to one let and not many
+//todo retrive multiple let to one let and not many, check the rest of the array !
 function unparse_variable_declaration(code_array) {
     if(code_array[0].type == 'variable declaration'){
         let var_dec_st = code_array.shift();
         let let_st = 'let ' + var_dec_st.name;
-        if(var_dec_st.value != null)
-            let_st = let_st + ' = ' + var_dec_st.value;
+        if(var_dec_st.value != null){
+            if(Array.isArray(var_dec_st.value))   let_st = let_st + ' = [' + var_dec_st.value + ']';
+            else let_st = let_st + ' = ' + var_dec_st.value;
+        }
         return let_st + ';';
     }
     return '';
@@ -106,7 +104,8 @@ function unparse_assignment_expression(code_array) {
     //insertValueToList(toParse.loc, 'variable declaration', toParse.id.name, null, parseLiterals(toParse.init));
     if(code_array[0].type == 'assignment expression'){
         let current = code_array.shift();
-        return current.name + ' = ' + current.value + ';';
+        if(Array.isArray(current.value))   return current.name + ' = [' + current.value + '];';
+        else return current.name + ' = ' + current.value + ';';
     }
     return '';
 }
@@ -120,7 +119,7 @@ function unparse_for_statement(code_array) {
             update =  for_st.update.name + ' = ' + for_st.update.value;
         else if(for_st.update.type == 'update expression')
             update = for_st.update.value;
-        return 'for(' + unparse_variable_declaration(for_st.var) + for_st.condition + ';' + update + ')' + unparse_body(for_st.body);//TODO is var correct?
+        return 'for(' + unparse_variable_declaration(for_st.var) + for_st.condition + ';' + update + ')' + unparse_body(for_st.body);
     }
     return '';
 }
