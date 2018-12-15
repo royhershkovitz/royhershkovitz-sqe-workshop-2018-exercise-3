@@ -1,136 +1,18 @@
-export { substitute, color_condition_of_function };
-import { parseLiterals } from './code-analyzer';
-import { parseScript } from 'esprima';
+import * as esprima from 'esprima';
+export {substitute};
 
-const substitute = (code_array) => {    
-    scopes = [];
-    scope = [];
-    vars_in_body = [];
-    substitute_rec(code_array);
-};
+const substitute = (codeToOptimize) => parseProgram(codeToOptimize)
 
-function substitute_rec(code_array) {    
-    for(let i = 0; i < code_array.length; i++)
-        pass_on_array(code_array[i]);    
-}
+var current_scope = [];
+var scopes = [];
 
-let parsers = [ {type:'assignment expression', parser: update_scope_assignment}, {type:'variable declaration', parser: add_to_scope},
-                {type:'function declaration', parser: forgetable_body_based}, {type: 'for statement', parser: body_cond_loop}, {type: 'while statement', parser: body_cond_loop},
-                {type:'if statement', parser: body_cond_based}, {type: 'else if statement', parser: body_cond_based}, {type: 'else statement', parser: forgetable_body_based},
-                {type: 'return statement', parser: return_rep} ],
-    scopes,
-    scope ;
-
-function pass_on_array(expr){
-    //console.log(expr);
-    for(let i = 0; i<parsers.length; i++)
-    {
-        if(parsers[i].type == expr.type){
-            parsers[i].parser(expr); 
-            return;
-        }
-    }
-    //console.log("type not found: " + expr.type);
-}
-
-function return_rep(return_ex){
-    return_ex.value = replace_a_vars_with_vals(return_ex.value);    
-}
-
-function add_to_scope(vardecl){
-    if(vardecl.value != null && !Array.isArray(vardecl.value)){//TODO support arrays
-        vardecl.color = 'deleted';
-        vardecl.value = replace_a_vars_with_vals(vardecl.value);
-        push_value(vardecl.name, vardecl.value);
-    }
-}
-
-function update_scope_assignment(vardecl){
-    let name = vardecl.name;
-    if(name[name.length - 1] == ']') return;
-    if(vardecl.value != null && !Array.isArray(vardecl.value)){//TODO support arrays
-        porbidden_var = false;
-        vardecl.value = replace_a_vars_with_vals_assignment(vardecl.value, vardecl.name);
-        if(! (in_body_mode & porbidden_var))
-            vardecl.color = 'deleted';
-        push_value(name, vardecl.value);
-    }
-}
-
-function replace_a_vars_with_vals_assignment(expr, name){
-    current_identifier_name = name;
-    let replaced = replace_a_vars_with_vals(expr);    
-    current_identifier_name = null;
-    return replaced;
-}
-
-function replace_a_vars_with_vals(expr){
-    let parsed_lit = parseScript(expr + ';').body[0].expression;
-    return find_all_identifiers_and_replace(parsed_lit);
-}
-
-let has_identifier;
-let current_identifier_name = null;
-function find_all_identifiers_and_replace(toParse) {
-    has_identifier = false;
-    toParse = find_identifiers_rec(toParse);
-    let lits =  parseLiterals(toParse);
-
-    if(!has_identifier) lits = eval(lits);
-    return lits;    
-}
-
-function find_identifiers_rec(toParse) {
-    return toParse.type == 'Identifier' ? replace_identifier(toParse) :
-    toParse.right != null ? {type: 'BinaryExpression', right: find_identifiers_rec(toParse.right), left: find_identifiers_rec(toParse.left), operator: toParse.operator} :
-    toParse.argument != null ? {type: 'UnaryExpression', prefix: toParse.prefix, operator: toParse.operator,  argument: find_identifiers_rec(toParse.argument)} : toParse ;
-}
-// type == 'MemberExpression' ? parseMemberExpression(toParse) : null;   TODO  
-
-function replace_identifier(identifier){
-    if(in_body_mode & vars_in_body.includes(identifier.name)) porbidden_var = true;
-    let variable = get_var(identifier.name), out;
-    if(variable == null){
-        has_identifier = true;
-        out = identifier;
-    }
-    else {
-        out = find_identifiers_rec(parseScript(variable.value + ';').body[0].expression);   
-    }
-    return out;
-}
-
-function delete_identifiers_from_scope(){
-    while(vars_in_body.length > 0)
-        remove_value(vars_in_body.pop());
-}
-
-let vars_in_body = [], in_body_mode = false, porbidden_var;
-function find_all_body_assignment_identifiers(array){
-    for(let i = 0; i<array.length; i++)
-        if(array[i].type == 'assignment expression')
-            vars_in_body.push(array[i].name);    
-}
-
-function body_cond_based(loop_based){
-    loop_based.condition = replace_a_vars_with_vals(loop_based.condition);
-    forgetable_body_based(loop_based);
-}
-
-function body_cond_loop(loop_based){
-    loop_based.condition = replace_a_vars_with_vals(loop_based.condition);
-
-    in_body_mode = true;   
-    find_all_body_assignment_identifiers(loop_based.body);
-
-    substitute_rec(loop_based.body);     
-    delete_deleted_lines(loop_based.body);  
-    
-    vars_in_body = [];
-    find_all_body_assignment_identifiers(loop_based.body);
-    
-    delete_identifiers_from_scope();
-    in_body_mode = false;    
+function parseProgram(toParse) {
+    current_scope = [];
+    var type = toParse.type;
+    //console.log(JSON.stringify(toParse, null, 2));
+    if(type == 'Program') 
+        toParse.body = parseExps(toParse.body);
+    return toParse;
 }
 
 function clone_JSON_ARRAY(frame){
@@ -142,48 +24,310 @@ function clone_JSON_ARRAY(frame){
     return new_scope;
 }
 
-function forgetable_body_based(loop_based){
-    scopes.push(scope);
-    scope = clone_JSON_ARRAY(scope);
-    substitute_rec(loop_based.body);        
-    scope = scopes.pop();
-
-    delete_deleted_lines(loop_based.body);
+function parseExps(toParse) {
+    toParse.map(parseExp);
+    return toParse;
 }
 
-function delete_deleted_lines(body){
-    let i = 0;
-    while(i < body.length){
-        if(body[i].color == 'deleted') body.splice(i, 1);
-        else        i++;
+function parseExp(toParse) {
+    var type = toParse.type;
+    return type == 'FunctionDeclaration' ? forgetable_body_based(toParse) : 
+        type == 'VariableDeclaration' ? parse_vardecl(toParse) :
+            type == 'ExpressionStatement' ? update_scope_assignment(toParse) :
+                type == 'ReturnStatement' ? return_rep(toParse) : parseLoops(toParse);    
+}
+
+function parseLoops(toParse){
+    var type = toParse.type;
+    return  type == 'ForStatement' ? body_cond_loop(toParse) :
+        type == 'WhileStatement' ? body_cond_loop(toParse) :
+            type == 'IfStatement' ? parseIfStatementn(toParse) : toParse;
+}
+
+function func_on_body(body_expr, func){
+    if(body_expr.type == 'BlockStatement')
+        body_expr.body = func(body_expr.body);
+    else{
+        body_expr = func([body_expr]);//assume if wont give other array
+        if(body_expr.length == 1) body_expr = body_expr[0];
     }
+    return body_expr;
+}
+
+function is_empty_body(body){
+    return body==null||body.length == 0;
+}
+
+function forgetable_body_based(loop_based){
+    scopes.push(current_scope);
+    current_scope = clone_JSON_ARRAY(current_scope);
+    loop_based.body = func_on_body(loop_based.body, substitute_rec);
+    current_scope = scopes.pop();
+    return loop_based;
+}
+
+function substitute_rec(body_array) {  
+    let index = 0;
+    while(index < body_array.length){
+        body_array[index] = parseExp(body_array[index]);
+        if(body_array[index] == -1) 
+            body_array.splice(index, 1);//WHILIE/IF checks should be done here
+        else index++;
+    }
+    unused_vardecl_removed(body_array);
+    return body_array;
+}
+
+function remove_let(declarations){
+    let index = 0;
+    while(index < declarations.length){
+        //{"type":"VariableDeclarator","id":{"type":"Identifier","name":"x"},"init":{"type":"Literal","value":1,"raw":"1"}}],"kind":"let"}
+        if(declarations[index].type == 'VariableDeclarator' && 
+                get_var(declarations[index].id.name)!=null)
+             declarations.splice(index, 1);
+        else index++;        
+    } 
+}
+
+function unused_vardecl_removed(body_array){
+    let index = 0;
+    while(index < body_array.length){
+        if(body_array[index].type == 'VariableDeclaration'){
+            remove_let(body_array[index].declarations);
+            if(body_array[index].declarations.length == 0)
+                body_array.splice(index, 1);
+            else index++;
+        }
+        else index++;
+    } 
+}
+
+function parseLiterals(toParse) {    
+    if(toParse == null) return null;
+    var type = toParse.type;
+    return type == 'Identifier' ? parseIdentifier(toParse) :
+        type == 'Literal' ? parseLitetral(toParse) : 
+            type == 'BinaryExpression' ? parseBinaryExpression(toParse) :
+                type == 'CallExpression' ? parseCallExpressionLit(toParse) :
+                    parseComplecatedLiteral(toParse);
+}
+
+function parseComplecatedLiteral(toParse){
+    var type = toParse.type;
+    return type == 'LogicalExpression' ? parseBinaryExpression(toParse) : 
+        type == 'UnaryExpression' ? parseUnaryExpression(toParse) :
+            type == 'UpdateExpression' ? parseUnaryExpression(toParse) :                                     
+                type == 'MemberExpression' ? parseMemberExpression(toParse) :
+                    type == "ArrayExpression" ? toParse.elements.map(parseLiterals) : null;    
+}
+
+function parseLitetral(toParse) {
+    return toParse.value;
+}
+
+function get_name(obj){
+	var name;
+	if(obj.type != null) name = parseLiterals(obj);
+	else name = obj.name;
+	return name;
+}
+
+function parseMemberExpression(toParse){	
+    return toParse.object.name + '[' + get_name(toParse.property) + ']';
+}
+
+let paren_unimportant = ['+', '<', '>', '<=', '>='];
+function parseBinaryExpression(toParse) {    
+    let left_side =  parseLiterals(toParse.left);
+    let right_side =  parseLiterals(toParse.right);
+    if(!paren_unimportant.includes(toParse.operator)){        
+        if(toParse.left.type == 'BinaryExpression')
+            left_side = '(' + left_side + ')';
+        if(toParse.right.type == 'BinaryExpression')
+            right_side = '(' + right_side + ')';
+    }
+    return left_side + ' ' + toParse.operator + ' ' + right_side;
+}
+
+function parseUnaryExpression(toParse) {
+    return toParse.prefix ? toParse.operator + '' + parseLiterals(toParse.argument) :
+        parseLiterals(toParse.argument) + '' + toParse.operator;
+}
+
+function parseIdentifier(toParse) {
+    return toParse.name;
+}
+
+function parse_args(code_array) {
+    //insertValueToList(toParse.loc, 'callee argument', null, null, parseLiterals(toParse));
+    if(code_array.length == 0)
+        return '';
+    else if(code_array[0].type == 'callee argument')
+        return code_array.shift().value + parse_args_comma(code_array);    
+    return '';
+}
+
+function parse_args_comma(code_array) {
+    //insertValueToList(toParse.loc, 'callee argument', null, null, parseLiterals(toParse));
+    if(code_array.length == 0)
+        return '';
+    else if(code_array[0].type == 'callee argument')
+        return ', ' + code_array.shift().value + parse_args_comma(code_array);
+    return '';
+}
+
+function parseCallExpressionLit(toParse) {
+    let params = extendScopeForFunction(() => 
+    {
+        toParse.arguments.forEach(parseArg);
+    });
+    params.toString();
+    return toParse.callee.name+'(' + parse_args(params) + ')';
+}
+
+function parseIfStatementn(toParse) {
+    let body = parseBody(toParse.consequent);
+    insertValueToList(toParse.loc, 'if statement', null, parseLiterals(toParse.test), null, body);
+    parseElseIfStatement(toParse);
+}
+
+//give the opportunity to parse multiple else if as 'else if statement'
+function parseElseIfStatement(toParse) {
+    toParse = toParse.alternate;
+    if(toParse != null){
+        if(toParse.type == 'IfStatement')  {
+            let body = parseBody(toParse.consequent);
+            insertValueToList(toParse.loc, 'else if statement', null, parseLiterals(toParse.test), null, body);
+            parseElseIfStatement(toParse);
+        }
+        else {
+            let body = parseBody(toParse);
+            insertValueToList(toParse.loc, 'else statement', null, null, null, body);
+        }
+    }
+}
+function parse_vardecl(toParse){
+    toParse.declarations.forEach(add_to_scope);
+    return toParse;
+}
+
+function add_to_scope(vardecl){
+    if(vardecl.init != null){//TODO support arrays
+        vardecl.init = find_all_identifiers_and_replace(vardecl.init);
+        push_value(vardecl.id.name, vardecl.init);
+    }
+    //console.log('added ' + vardecl.id.name + ' ' + JSON.stringify(get_var(vardecl.id.name)));
+}
+
+function update_scope_assignment(assignment){
+    //TODO support arrays
+    let name = assignment.expression.left.name;
+    porbidden_var = false;
+    assignment.expression.right = find_all_identifiers_and_replace(assignment.expression.right);
+    push_value(name, assignment.expression.right);
+    //console.log('updated ' + name + ' ' + JSON.stringify(get_var(name)));
+    if(!(in_body_mode & porbidden_var))
+        return -1;
+    return assignment;
+}
+
+function return_rep(return_ex){
+    return_ex.argument = find_all_identifiers_and_replace(return_ex.argument);
+    return return_ex;
+}
+
+let has_identifier;
+function find_all_identifiers_and_replace(toParse) {
+    has_identifier = false;    
+    let out = find_identifiers_rec(toParse);
+    if(!has_identifier){
+        let lits =  parseLiterals(out);
+        //console.log(lits);
+        lits = eval(lits);
+        out = esprima.parseScript(lits + ';').body[0].expression;
+    }
+    return out;    
+}
+
+function find_identifiers_rec(toParse) {
+    return toParse.type == 'Identifier' ? replace_identifier(toParse) :
+    toParse.type == 'BinaryExpression' ? replace_BinaryExpression(toParse) : 
+    toParse.type == 'UnaryExpression' ? replace_UnaryExpression(toParse) : toParse ;
+}
+// type == 'MemberExpression' ? parseMemberExpression(toParse) : null;   TODO  
+function replace_UnaryExpression(unary_exp){
+    binary_exp.argument = find_identifiers_rec(unary_exp.argument);
+    return unary_exp;
+}
+
+function replace_BinaryExpression(binary_exp){
+    binary_exp.right = find_identifiers_rec(binary_exp.right);
+    binary_exp.left = find_identifiers_rec(binary_exp.left);
+    return binary_exp;
+}
+
+function replace_identifier(identifier){    
+    if(in_body_mode & vars_in_body.includes(identifier.name)) porbidden_var = true;
+    let variable = get_var(identifier.name), out;
+    if(variable == null){
+        has_identifier = true;
+        out = identifier;
+    }
+    else {
+        out = find_identifiers_rec(variable.value);   
+    }
+    return out;
+}
+
+let vars_in_body = [], in_body_mode = false, porbidden_var;
+function find_all_body_assignment_identifiers(body){
+    for(let i = 0; i < body.length; i++){
+        if(body[i].type == 'ExpressionStatement')
+            vars_in_body.push(body[i].expression.left.name); 
+    }
+    return body;
+}
+
+function delete_identifiers_from_scope(){
+    while(vars_in_body.length > 0)
+        remove_value(vars_in_body.pop());
+}
+
+function body_cond_loop(loop_based){
+    loop_based.test = find_all_identifiers_and_replace(loop_based.test);
+
+    loop_based.body = func_on_body(loop_based.body, find_all_body_assignment_identifiers);
+
+    in_body_mode = true; 
+    loop_based.body = func_on_body(loop_based.body, substitute_rec);
+    in_body_mode = false;
+    
+    vars_in_body = [];
+    loop_based.body = func_on_body(loop_based.body, find_all_body_assignment_identifiers);
+
+    delete_identifiers_from_scope();
+    if(is_empty_body(loop_based.body)) return -1;
+    return loop_based;
 }
 
 function get_var(var_name){
-    for(let i = 0; i < scope.length; i++){
-        if(scope[i].name == var_name)
-            return scope[i];
+    for(let i = 0; i < current_scope.length; i++){
+        if(current_scope[i].name == var_name)
+            return current_scope[i];
     }
     return null;
 }
 
 function push_value(var_name, var_value){
     let variable = get_var(var_name);
-    if(variable == null)    scope.push({name: var_name, value: var_value});    
+    if(variable == null)    current_scope.push({name: var_name, value: var_value});    
     else                    variable.value = var_value;
 }
 
 function remove_value(var_name){
-    for(let i = 0; i < scope.length; i++)
-        if(scope[i].name == var_name){
-            scope.splice(i,1);
+    for(let i = 0; i < current_scope.length; i++)
+        if(current_scope[i].name == var_name){
+            current_scope.splice(i,1);
             return;
         }    
 }
-
-const color_condition_of_function = (code_array, param) => {    
-    //TODO eval function
-    //TODO linter
-    //TODO test
-    return code_array;
-};

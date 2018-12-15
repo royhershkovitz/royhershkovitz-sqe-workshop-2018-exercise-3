@@ -1,17 +1,18 @@
 import $ from 'jquery';
-import {parseCode, parsedList} from './code-analyzer';
-import {to_code} from './code_assembler';
-import { substitute, color_condition_of_function } from './symbolic_substitution';
+import * as esprima from 'esprima';
+import * as escodegen from 'escodegen';
+import {substitute} from './symbolic_substitution';
 
 $(document).ready(function () {
     $('#codeSubmissionButton').click(() => {
         let codeToParse = $('#codePlaceholder').val();
-        let parsedCode = parseCode(codeToParse);        
-        console.log(parsedList());
-        console.log(parsedCode);
-        let parsed_lst = parsedList();
-        substitute(parsed_lst);
-        $('#parsedCode').val(to_code(parsed_lst));
+        let parsedCode = esprima.parse(codeToParse);
+        //$('#codePlaceholder').val(escodegen.generate(substitute(parsedCode)));
+
+        //$('#parsedCode').val(JSON.stringify(substitute(parsedCode)));
+
+        $('#parsedCode').val(escodegen.generate(substitute(parsedCode)));
+        
         //$('#parsedCode').val(JSON.stringify(parsedCode));
     });
 });
