@@ -11,7 +11,7 @@
 
             .textAreaWrapper {
                 width: 100%;
-                height: 80vh;
+                height: 70vh;
             }
 
             textarea {
@@ -42,7 +42,7 @@
                 </td>
                 <td>
                     <div class="textAreaWrapper">
-                        <textarea id="parsedCode" title="Parse code"></textarea>
+                        <pre id="parsedCode" title="excuted code"></pre>
                     </div>
                 </td>
             </tr>
@@ -56,7 +56,10 @@
                 </td>
             </tr>
         </table>
-
+        <p>input vector</p>
+        <textarea id="input" title="Enter arguments here"></textarea>
+        <p>output</p>
+        <p id="output"></p>
         <script src="dist/bundle.js"></script>
     </body>
 </html>

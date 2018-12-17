@@ -1,7 +1,20 @@
 import * as esprima from 'esprima';
-export {substitute};
+
+export {substitute, pred_infer};
 
 const substitute = (codeToOptimize) => parseProgram(codeToOptimize)
+
+let line_num = -1;
+let if_add_mode = false;
+let if_add_mode_last_if_line;
+const pred_infer = (parsedCode) => {
+    //console.log(parsedCode);
+    if_add_mode = true;
+    if_add_mode_last_if_line = [];
+    let parsed = parseProgram(parsedCode);
+    if_add_mode = false;
+    return parsed;
+};
 
 var current_scope = [];
 var scopes = [];
@@ -44,9 +57,18 @@ function parseLoops(toParse){
             type == 'IfStatement' ? parseIfStatementn(toParse) : toParse;
 }
 
-function func_on_body(body_expr, func){
-    if(body_expr.type == 'BlockStatement')
+function value_func_on_body(body_expr, func){
+    if(body_expr.type == 'BlockStatement'){
+        return func(body_expr.body);
+    }
+    return func([body_expr]);
+}
+
+function func_on_body(body_expr, func, rem_brackets_if_one){
+    if(body_expr.type == 'BlockStatement'){
         body_expr.body = func(body_expr.body);
+        if(rem_brackets_if_one!=false & body_expr.body.length == 1) body_expr = body_expr.body[0];
+    }
     else{
         body_expr = func([body_expr]);//assume if wont give other array
         if(body_expr.length == 1) body_expr = body_expr[0];
@@ -61,7 +83,7 @@ function is_empty_body(body){
 function forgetable_body_based(loop_based){
     scopes.push(current_scope);
     current_scope = clone_JSON_ARRAY(current_scope);
-    loop_based.body = func_on_body(loop_based.body, substitute_rec);
+    loop_based.body = func_on_body(loop_based.body, substitute_rec, false);
     current_scope = scopes.pop();
     return loop_based;
 }
@@ -70,7 +92,7 @@ function substitute_rec(body_array) {
     let index = 0;
     while(index < body_array.length){
         body_array[index] = parseExp(body_array[index]);
-        if(body_array[index] == -1) 
+        if(body_array[index] == -1)
             body_array.splice(index, 1);//WHILIE/IF checks should be done here
         else index++;
     }
@@ -158,53 +180,84 @@ function parseIdentifier(toParse) {
     return toParse.name;
 }
 
-function parse_args(code_array) {
-    //insertValueToList(toParse.loc, 'callee argument', null, null, parseLiterals(toParse));
-    if(code_array.length == 0)
-        return '';
-    else if(code_array[0].type == 'callee argument')
-        return code_array.shift().value + parse_args_comma(code_array);    
-    return '';
+function end_with_ret(body){
+    for(let i = 0; i < body.length; i++){
+        if(body[i].type == 'ReturnStatement')
+            return true;
+    }
+    return false;
 }
 
-function parse_args_comma(code_array) {
-    //insertValueToList(toParse.loc, 'callee argument', null, null, parseLiterals(toParse));
-    if(code_array.length == 0)
-        return '';
-    else if(code_array[0].type == 'callee argument')
-        return ', ' + code_array.shift().value + parse_args_comma(code_array);
-    return '';
+function parse_if_else(toParse){
+    if(value_func_on_body(toParse, end_with_ret)){
+        scopes.push(current_scope);
+        current_scope = clone_JSON_ARRAY(current_scope);
+        toParse = func_on_body(toParse, substitute_rec);
+        current_scope = scopes.pop();
+    }
+    else{
+        scopes.push(vars_in_body); vars_in_body = [];
+        toParse = func_on_body(toParse, find_all_body_assignment_identifiers);
+        if_to_del = if_to_del.concat(vars_in_body); vars_in_body = scopes.pop();
+    }
+    if(if_add_mode){
+        let if_code = [];
+        if(if_add_mode_last_if_line != []){            
+            let i = 0;
+            while(i < if_add_mode_last_if_line.length){
+                let curr_line_num = if_add_mode_last_if_line[i++];                
+                if_code.push(esprima.parse(`pred_array.push({line:
+                    ${curr_line_num},color:\'red\'});`).body[0]);
+            }
+        }
+        if_code.push(esprima.parse(`pred_array.push({line:${line_num},color:\'green\'});`).body[0]);
+        if(toParse.body!=null && toParse.body.type == "BlockStatement")
+            toParse.body.unshift(if_code);
+        else{
+            if_code.push(toParse);
+            toParse = {type : "BlockStatement", body : if_code};
+        }
+    }
+    return toParse;
 }
 
-function parseCallExpressionLit(toParse) {
-    let params = extendScopeForFunction(() => 
-    {
-        toParse.arguments.forEach(parseArg);
-    });
-    params.toString();
-    return toParse.callee.name+'(' + parse_args(params) + ')';
-}
-
+let if_to_del = [];
 function parseIfStatementn(toParse) {
-    let body = parseBody(toParse.consequent);
-    insertValueToList(toParse.loc, 'if statement', null, parseLiterals(toParse.test), null, body);
-    parseElseIfStatement(toParse);
+    //if not end with ret in body mode else - reg
+    toParse.test = find_all_identifiers_and_replace(toParse.test);
+    if(if_add_mode){
+        if_add_mode_last_if_line=[];
+        line_num = toParse.test.loc.start.line;
+    }
+    toParse.consequent = parse_if_else(toParse.consequent);  
+    toParse.alternate = parseElseIfStatementRec(toParse.alternate);
+
+    delete_identifiers_from_scope(if_to_del);
+
+    return toParse;
 }
 
 //give the opportunity to parse multiple else if as 'else if statement'
-function parseElseIfStatement(toParse) {
-    toParse = toParse.alternate;
+function parseElseIfStatementRec(toParse) {
     if(toParse != null){
         if(toParse.type == 'IfStatement')  {
-            let body = parseBody(toParse.consequent);
-            insertValueToList(toParse.loc, 'else if statement', null, parseLiterals(toParse.test), null, body);
-            parseElseIfStatement(toParse);
+            toParse.test = find_all_identifiers_and_replace(toParse.test);
+            if(if_add_mode){
+                if_add_mode_last_if_line.push(line_num);
+                line_num = toParse.test.loc.start.line;
+            }
+            toParse.consequent = parse_if_else(toParse.consequent);  
+            toParse.alternate = parseElseIfStatementRec(toParse.alternate);
         }
-        else {
-            let body = parseBody(toParse);
-            insertValueToList(toParse.loc, 'else statement', null, null, null, body);
+        else{ 
+            if(if_add_mode){
+                if_add_mode_last_if_line.push(line_num);
+                line_num = toParse.loc.start.line-1;
+            }
+            toParse = parse_if_else(toParse);  
         }
     }
+    return toParse;
 }
 function parse_vardecl(toParse){
     toParse.declarations.forEach(add_to_scope);
@@ -221,6 +274,7 @@ function add_to_scope(vardecl){
 
 function update_scope_assignment(assignment){
     //TODO support arrays
+    if(assignment.expression.type != 'AssignmentExpression') return assignment;//TODO support callee expression
     let name = assignment.expression.left.name;
     porbidden_var = false;
     assignment.expression.right = find_all_identifiers_and_replace(assignment.expression.right);
@@ -238,6 +292,7 @@ function return_rep(return_ex){
 
 let has_identifier;
 function find_all_identifiers_and_replace(toParse) {
+    if(toParse == null) return null;
     has_identifier = false;    
     let out = find_identifiers_rec(toParse);
     if(!has_identifier){
@@ -282,15 +337,15 @@ function replace_identifier(identifier){
 let vars_in_body = [], in_body_mode = false, porbidden_var;
 function find_all_body_assignment_identifiers(body){
     for(let i = 0; i < body.length; i++){
-        if(body[i].type == 'ExpressionStatement')
+        if(body[i].type == 'ExpressionStatement' && body[i].expression.type == 'AssignmentExpression')
             vars_in_body.push(body[i].expression.left.name); 
     }
     return body;
 }
 
-function delete_identifiers_from_scope(){
-    while(vars_in_body.length > 0)
-        remove_value(vars_in_body.pop());
+function delete_identifiers_from_scope(array){
+    while(array.length > 0)
+        remove_value(array.pop());
 }
 
 function body_cond_loop(loop_based){
@@ -305,7 +360,7 @@ function body_cond_loop(loop_based){
     vars_in_body = [];
     loop_based.body = func_on_body(loop_based.body, find_all_body_assignment_identifiers);
 
-    delete_identifiers_from_scope();
+    delete_identifiers_from_scope(vars_in_body);
     if(is_empty_body(loop_based.body)) return -1;
     return loop_based;
 }

@@ -25,11 +25,19 @@
         "instrument": false,
         "sourceMap": false
     },
+    "safe-eval": {
+        "include": [
+            "src/**/*.js"
+        ],
+        "instrument": false,
+        "sourceMap": false
+    },
     "author": "",
     "license": "ISC",
     "dependencies": {
         "esprima": "^4.0.0",
-        "jquery": "^3.3.1"
+        "jquery": "^3.3.1",
+        "safe-eval": "^0.4.1"
     },
     "devDependencies": {
         "cross-env": "^5.2.0",
@@ -39,6 +47,7 @@
         "mocha-webpack": "^2.0.0-beta.0",
         "nyc": "^12.0.2",
         "escodegen": "^1.11.0",
+        "safe-eval": "^0.4.1",
         "webpack": "^4.12.2",
         "webpack-cli": "^2.1.4"
     }
