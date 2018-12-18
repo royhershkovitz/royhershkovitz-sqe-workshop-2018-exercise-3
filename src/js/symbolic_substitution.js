@@ -252,6 +252,7 @@ function find_all_identifiers_and_replace(toParse) {
         let lits =  escodegen.generate(out);
         //console.log(lits);
         lits = eval(lits);
+        if(Array.isArray(lits))  lits = '[' + lits + ']';
         out = esprima.parseScript(lits + ';').body[0].expression;
     }
     return out;    
@@ -270,8 +271,18 @@ function find_identifiers_rec(toParse) {
     }
 
     function find_2(){
-        return type == 'MemberExpression' ? replace_MemberExpression(toParse) : toParse;
+        return type == 'MemberExpression' ? replace_MemberExpression(toParse) : 
+            type == 'ArrayExpression' ? replace_ArrayExpression(toParse) : toParse;
     }
+}
+
+function replace_ArrayExpression(array){
+    let i = 0;
+    while(i < array.elements.length){
+        array.elements[i] = find_identifiers_rec(array.elements[i]);
+        i++;
+    }
+    return array;
 }
 
 function replace_CallExpression(call_func){
@@ -286,6 +297,7 @@ function replace_CallExpression(call_func){
 
 function replace_MemberExpression(mem_exp){
     has_identifier = true;
+    mem_exp.object = find_identifiers_rec(mem_exp.object);
     mem_exp.property = find_identifiers_rec(mem_exp.property);
     return mem_exp;
 }
