@@ -11,7 +11,7 @@ function wraper(text,when,lines,pre,after){
             if(lines[0].line == counter){
                 text = text.substring(0,last) + pre + lines.shift().color + '";>' +
                  text.substring(last,index+1) + after + text.substring(index+1);
-                 index = index + 3 + pre.length + after.length;
+                index = index + 3 + pre.length + after.length;
             }          
             counter++;           
             last = index;
@@ -26,16 +26,17 @@ function get_lines(parsedCode, input){
     pred_array_out = [];
     var context = {
         pred_array: pred_array_out
-    }
+    };
     parsedCode = pred_infer(parsedCode);
     //console.log(escodegen.generate(parsedCode));
+    //TODO global support
     return {result : safeval('('+escodegen.generate(parsedCode)+')('+input+')', context), lines:pred_array_out} ;
 }
 
 function to_html(text, lines){
     //console.log(lines);
     text = wraper(text,'\n',lines,//[{line:0, color:'red'}, {line:3, color:'green'}, {line:5, color:'red'}],
-    '<bspan style="background-color:','</bspan>');
+        '<bspan style="background-color:','</bspan>');
     return text;
 }
 
@@ -51,8 +52,8 @@ $(document).ready(function () {
         let input = ($('#input').val());
         let optimized_text = escodegen.generate(parsedCode);
         let sol = get_lines(esprima.parse(optimized_text, {loc: true}), input);
-        document.getElementById("output").innerHTML = sol.result;
-        document.getElementById("parsedCode").innerHTML = to_html(optimized_text,sol.lines);
+        document.getElementById('output').innerHTML = sol.result;
+        document.getElementById('parsedCode').innerHTML = to_html(optimized_text,sol.lines);
         
     });
 });

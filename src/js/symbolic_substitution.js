@@ -1,8 +1,9 @@
 import * as esprima from 'esprima';
+import * as escodegen from 'escodegen';
 
 export {substitute, pred_infer};
 
-const substitute = (codeToOptimize) => parseProgram(codeToOptimize)
+const substitute = (codeToOptimize) => parseProgram(codeToOptimize);
 
 let line_num = -1;
 let if_add_mode = false;
@@ -21,10 +22,9 @@ var scopes = [];
 
 function parseProgram(toParse) {
     current_scope = [];
-    var type = toParse.type;
     //console.log(JSON.stringify(toParse, null, 2));
-    if(type == 'Program') 
-        toParse.body = parseExps(toParse.body);
+    //var type = toParse.type;    if(type == 'Program') 
+    toParse.body = parseExps(toParse.body);
     return toParse;
 }
 
@@ -52,9 +52,9 @@ function parseExp(toParse) {
 
 function parseLoops(toParse){
     var type = toParse.type;
-    return  type == 'ForStatement' ? body_cond_loop(toParse) :
-        type == 'WhileStatement' ? body_cond_loop(toParse) :
-            type == 'IfStatement' ? parseIfStatementn(toParse) : toParse;
+    return  type == 'WhileStatement' ? body_cond_loop(toParse) :
+    //type == 'ForStatement' ? body_cond_loop(toParse) :
+        type == 'IfStatement' ? parseIfStatementn(toParse) : toParse;
 }
 
 function value_func_on_body(body_expr, func){
@@ -106,7 +106,7 @@ function remove_let(declarations){
         //{"type":"VariableDeclarator","id":{"type":"Identifier","name":"x"},"init":{"type":"Literal","value":1,"raw":"1"}}],"kind":"let"}
         if(declarations[index].type == 'VariableDeclarator' && 
                 get_var(declarations[index].id.name)!=null)
-             declarations.splice(index, 1);
+            declarations.splice(index, 1);
         else index++;        
     } 
 }
@@ -122,62 +122,6 @@ function unused_vardecl_removed(body_array){
         }
         else index++;
     } 
-}
-
-function parseLiterals(toParse) {    
-    if(toParse == null) return null;
-    var type = toParse.type;
-    return type == 'Identifier' ? parseIdentifier(toParse) :
-        type == 'Literal' ? parseLitetral(toParse) : 
-            type == 'BinaryExpression' ? parseBinaryExpression(toParse) :
-                type == 'CallExpression' ? parseCallExpressionLit(toParse) :
-                    parseComplecatedLiteral(toParse);
-}
-
-function parseComplecatedLiteral(toParse){
-    var type = toParse.type;
-    return type == 'LogicalExpression' ? parseBinaryExpression(toParse) : 
-        type == 'UnaryExpression' ? parseUnaryExpression(toParse) :
-            type == 'UpdateExpression' ? parseUnaryExpression(toParse) :                                     
-                type == 'MemberExpression' ? parseMemberExpression(toParse) :
-                    type == "ArrayExpression" ? toParse.elements.map(parseLiterals) : null;    
-}
-
-function parseLitetral(toParse) {
-    return toParse.value;
-}
-
-function get_name(obj){
-	var name;
-	if(obj.type != null) name = parseLiterals(obj);
-	else name = obj.name;
-	return name;
-}
-
-function parseMemberExpression(toParse){	
-    return toParse.object.name + '[' + get_name(toParse.property) + ']';
-}
-
-let paren_unimportant = ['+', '<', '>', '<=', '>='];
-function parseBinaryExpression(toParse) {    
-    let left_side =  parseLiterals(toParse.left);
-    let right_side =  parseLiterals(toParse.right);
-    if(!paren_unimportant.includes(toParse.operator)){        
-        if(toParse.left.type == 'BinaryExpression')
-            left_side = '(' + left_side + ')';
-        if(toParse.right.type == 'BinaryExpression')
-            right_side = '(' + right_side + ')';
-    }
-    return left_side + ' ' + toParse.operator + ' ' + right_side;
-}
-
-function parseUnaryExpression(toParse) {
-    return toParse.prefix ? toParse.operator + '' + parseLiterals(toParse.argument) :
-        parseLiterals(toParse.argument) + '' + toParse.operator;
-}
-
-function parseIdentifier(toParse) {
-    return toParse.name;
 }
 
 function end_with_ret(body){
@@ -200,35 +144,44 @@ function parse_if_else(toParse){
         toParse = func_on_body(toParse, find_all_body_assignment_identifiers);
         if_to_del = if_to_del.concat(vars_in_body); vars_in_body = scopes.pop();
     }
-    if(if_add_mode){
-        let if_code = [];
-        if(if_add_mode_last_if_line != []){            
-            let i = 0;
-            while(i < if_add_mode_last_if_line.length){
-                let curr_line_num = if_add_mode_last_if_line[i++];                
-                if_code.push(esprima.parse(`pred_array.push({line:
-                    ${curr_line_num},color:\'red\'});`).body[0]);
-            }
+    return pred_infer_check(toParse);
+}
+
+function pred_infer_check(toParse) {
+    if (if_add_mode) {
+        let if_code = pred_infer_previous_if();
+        if_code.push(esprima.parse(`pred_array.push({line:${line_num},color:'MediumSeaGreen'});`).body[0]);
+        if (toParse.body != null & toParse.type == 'BlockStatement') 
+        {
+            while(if_code.length > 0)
+                toParse.body.unshift(if_code.pop());
         }
-        if_code.push(esprima.parse(`pred_array.push({line:${line_num},color:\'green\'});`).body[0]);
-        if(toParse.body!=null && toParse.body.type == "BlockStatement")
-            toParse.body.unshift(if_code);
-        else{
+        else {
             if_code.push(toParse);
-            toParse = {type : "BlockStatement", body : if_code};
+            toParse = { type: 'BlockStatement', body: if_code };
         }
     }
     return toParse;
 }
 
+function pred_infer_previous_if() {
+    let if_code = [];
+    let i = 0;
+    while (i < if_add_mode_last_if_line.length) {
+        let curr_line_num = if_add_mode_last_if_line[i++];
+        if_code.push(esprima.parse(`pred_array.push({line:${curr_line_num},color:'Tomato'});`).body[0]);
+    }    
+    return if_code;
+}
+
 let if_to_del = [];
 function parseIfStatementn(toParse) {
     //if not end with ret in body mode else - reg
-    toParse.test = find_all_identifiers_and_replace(toParse.test);
     if(if_add_mode){
         if_add_mode_last_if_line=[];
         line_num = toParse.test.loc.start.line;
     }
+    toParse.test = find_all_identifiers_and_replace(toParse.test);
     toParse.consequent = parse_if_else(toParse.consequent);  
     toParse.alternate = parseElseIfStatementRec(toParse.alternate);
 
@@ -241,24 +194,24 @@ function parseIfStatementn(toParse) {
 function parseElseIfStatementRec(toParse) {
     if(toParse != null){
         if(toParse.type == 'IfStatement')  {
-            toParse.test = find_all_identifiers_and_replace(toParse.test);
             if(if_add_mode){
                 if_add_mode_last_if_line.push(line_num);
                 line_num = toParse.test.loc.start.line;
             }
+            toParse.test = find_all_identifiers_and_replace(toParse.test);
             toParse.consequent = parse_if_else(toParse.consequent);  
             toParse.alternate = parseElseIfStatementRec(toParse.alternate);
         }
-        else{ 
+        else {
             if(if_add_mode){
                 if_add_mode_last_if_line.push(line_num);
                 line_num = toParse.loc.start.line-1;
             }
             toParse = parse_if_else(toParse);  
-        }
-    }
+        }    }
     return toParse;
 }
+
 function parse_vardecl(toParse){
     toParse.declarations.forEach(add_to_scope);
     return toParse;
@@ -274,7 +227,7 @@ function add_to_scope(vardecl){
 
 function update_scope_assignment(assignment){
     //TODO support arrays
-    if(assignment.expression.type != 'AssignmentExpression') return assignment;//TODO support callee expression
+    //if(assignment.expression.type != 'AssignmentExpression') return assignment;//TODO support callee expression
     let name = assignment.expression.left.name;
     porbidden_var = false;
     assignment.expression.right = find_all_identifiers_and_replace(assignment.expression.right);
@@ -292,11 +245,11 @@ function return_rep(return_ex){
 
 let has_identifier;
 function find_all_identifiers_and_replace(toParse) {
-    if(toParse == null) return null;
+    //if(toParse == null) return null; should not happen
     has_identifier = false;    
     let out = find_identifiers_rec(toParse);
     if(!has_identifier){
-        let lits =  parseLiterals(out);
+        let lits =  escodegen.generate(out);
         //console.log(lits);
         lits = eval(lits);
         out = esprima.parseScript(lits + ';').body[0].expression;
@@ -305,13 +258,40 @@ function find_all_identifiers_and_replace(toParse) {
 }
 
 function find_identifiers_rec(toParse) {
-    return toParse.type == 'Identifier' ? replace_identifier(toParse) :
-    toParse.type == 'BinaryExpression' ? replace_BinaryExpression(toParse) : 
-    toParse.type == 'UnaryExpression' ? replace_UnaryExpression(toParse) : toParse ;
+    let type = toParse.type;
+    let out = find_1();
+    return out == null ? find_2() : out;
+
+    function find_1() {
+        return type == 'Identifier' ? replace_identifier(toParse) :
+            type == 'BinaryExpression' ? replace_BinaryExpression(toParse) :
+                type == 'UnaryExpression' ? replace_UnaryExpression(toParse) :
+                    type == 'CallExpression' ? replace_CallExpression(toParse) : null;
+    }
+
+    function find_2(){
+        return type == 'MemberExpression' ? replace_MemberExpression(toParse) : toParse;
+    }
 }
-// type == 'MemberExpression' ? parseMemberExpression(toParse) : null;   TODO  
+
+function replace_CallExpression(call_func){
+    has_identifier = true;
+    let i = 0;
+    while(i < call_func.arguments.length){
+        call_func.arguments[i] = find_identifiers_rec(call_func.arguments[i]);
+        i++;
+    }
+    return call_func;
+}
+
+function replace_MemberExpression(mem_exp){
+    has_identifier = true;
+    mem_exp.property = find_identifiers_rec(mem_exp.property);
+    return mem_exp;
+}
+
 function replace_UnaryExpression(unary_exp){
-    binary_exp.argument = find_identifiers_rec(unary_exp.argument);
+    unary_exp.argument = find_identifiers_rec(unary_exp.argument);
     return unary_exp;
 }
 
@@ -337,10 +317,22 @@ function replace_identifier(identifier){
 let vars_in_body = [], in_body_mode = false, porbidden_var;
 function find_all_body_assignment_identifiers(body){
     for(let i = 0; i < body.length; i++){
-        if(body[i].type == 'ExpressionStatement' && body[i].expression.type == 'AssignmentExpression')
-            vars_in_body.push(body[i].expression.left.name); 
+        exp_statment(body[i]); 
+        //nested_loops(i);
     }
     return body;
+    function exp_statment(exp) {
+        if (exp.type == 'ExpressionStatement' && exp.expression.type == 'AssignmentExpression')
+            vars_in_body.push(exp.expression.left.name);
+    }
+    /*function nested_loops(i) {
+        if (body[i].type == 'ForStatement'){
+            exp_statment(body[i].init);
+            body[i].body = func_on_body(body[i].body, find_all_body_assignment_identifiers);
+        }//add nested if, if needed
+        if (body[i].type == 'WhileStatement')
+            body[i].body = func_on_body(body[i].body, find_all_body_assignment_identifiers);
+    }*/
 }
 
 function delete_identifiers_from_scope(array){
