@@ -239,6 +239,26 @@ describe('The javascript predicate inferior', () => {
                 }              
                 return -v;
             }`);
-            
+    });
+
+    it('is substituting&not infering while exp correctly', () => {
+        assert_eq_pred_inf(
+            `function foo(x, y, z){
+                let a = x + 1;
+                let b = a + y;
+                let c = 0;
+                
+                while (a < z) {
+                    c = a + b;
+                    z = c * z * 2;
+                }
+                
+                return z;
+            }`,
+            `function foo(x, y, z){
+                while (x + 1 < z) 
+                    z = (x + 1 + (x + 1 + y)) * z * 2;                
+                return z;
+            }`);
     });
 });
