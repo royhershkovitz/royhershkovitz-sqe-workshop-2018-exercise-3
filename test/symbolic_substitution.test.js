@@ -150,6 +150,41 @@ describe('The javascript predicate substituier', () => {
                 return -v;
             }`);
     });
+
+    it('is substituting array-member exp correctly', () => {
+        assert_eq_sub(
+            `function foo(z){
+                let v = 1;   
+                let a = [v,2,z];                 
+                return a[v];
+            }`,
+            `function foo(z){   
+                return [1,2,z][1];
+            }`);
+    });
+
+    it('is substituting array exp correctly', () => {
+        assert_eq_sub(
+            `function foo(z){ 
+                let a = [1,2,3];                 
+                return a;
+            }`,
+            `function foo(z){   
+                return [1,2,3];
+            }`);
+    });
+
+    it('is substituting array exp correctly2', () => {
+        assert_eq_sub(
+            `function foo(z){
+                let v = 1;   
+                let a = [v,2,z];                 
+                return a;
+            }`,
+            `function foo(z){   
+                return [1,2,z];
+            }`);
+    });
 });
 
 function assert_eq_pred_inf(left, right){
