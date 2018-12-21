@@ -2,7 +2,7 @@ import $ from 'jquery';
 import * as esprima from 'esprima';
 import * as escodegen from 'escodegen';
 import * as safeval from 'safe-eval';
-import {substitute, pred_infer} from './symbolic_substitution';
+import {code_convert_to_cfg, get_cfg, pred_infer} from './cfg_converter';
 
 function wraper(text,when,lines,pre,after){
     let index = 0, counter=1, last = 0;
@@ -44,16 +44,15 @@ $(document).ready(function () {
     $('#codeSubmissionButton').click(() => {
         let codeToParse = $('#codePlaceholder').val();
         let parsedCode = esprima.parse(codeToParse);
-        //$('#codePlaceholder').val(escodegen.generate(substitute(parsedCode)));
-        //$('#parsedCode').val(JSON.stringify(substitute(parsedCode)));
-        //$('#parsedCode').val(JSON.stringify(parsedCode));
         //console.log(parsedCode);
-        parsedCode = substitute(parsedCode);
+        code_convert_to_cfg(parsedCode);
         let input = ($('#input').val());
-        let optimized_text = escodegen.generate(parsedCode);
+        /*let optimized_text = escodegen.generate(parsedCode);
         let sol = get_lines(esprima.parse(optimized_text, {loc: true}), input);
+        if(Array.isArray(sol.result))  sol.result = '[' + sol.result + ']';
         document.getElementById('output').innerHTML = sol.result;
-        document.getElementById('parsedCode').innerHTML = to_html(optimized_text,sol.lines);
+        document.getElementById('parsedCode').innerHTML = to_html(optimized_text,sol.lines);*/
+        Console.log(get_cfg());
         
     });
 });
