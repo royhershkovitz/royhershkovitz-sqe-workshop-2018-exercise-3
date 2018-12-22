@@ -18,30 +18,17 @@
         "instrument": false,
         "sourceMap": false
     },
-    "escodegen": {
-        "include": [
-            "src/**/*.js"
-        ],
-        "instrument": false,
-        "sourceMap": false
-    },
-    "safe-eval": {
-        "include": [
-            "src/**/*.js"
-        ],
-        "instrument": false,
-        "sourceMap": false
-    },
     "author": "",
     "license": "ISC",
     "dependencies": {
+        "gojs": "^v1.8.35",
+        "escodegen": "^1.11.0",
         "esprima": "^4.0.0",
         "jquery": "^3.3.1",
         "safe-eval": "^0.4.1"
     },
     "devDependencies": {
         "cross-env": "^5.2.0",
-        "escodegen": "^1.11.0",
         "eslint": "^5.10.0",
         "istanbul-instrumenter-loader": "^3.0.1",
         "mocha": "^5.2.0",

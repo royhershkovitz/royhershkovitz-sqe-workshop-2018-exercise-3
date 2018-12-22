@@ -1,13 +1,17 @@
 import * as esprima from 'esprima';
-import * as escodegen from 'escodegen';
 
 export {code_convert_to_cfg, pred_infer};
 
-const code_convert_to_cfg = (codeToConvet) => parseProgram(codeToConvet);
+const code_convert_to_cfg = (codeToConvet) => {
+    parseProgram(codeToConvet);
+    return cfg;
+};
 
+const green_color = '#027710';
+const red_color   = '#6B0E01';
 let line_num = -1;
 let if_add_mode = false;
-let if_add_mode_last_if_line;
+let if_add_mode_last_if_line, cfg, node_key;
 const pred_infer = (parsedCode) => {
     //console.log(parsedCode);
     if_add_mode = true;
@@ -17,26 +21,12 @@ const pred_infer = (parsedCode) => {
     return parsed;
 };
 
-var current_scope = [];
-var scopes = [];
-
-var cfg = [];
-
 function parseProgram(toParse) {
-    current_scope = [];
-    //console.log(JSON.stringify(toParse, null, 2));
-    //var type = toParse.type;    if(type == 'Program') 
+    cfg = [];
+    if_json_to_update = [];    if_jsons_stack = [];
+    node_key = 0;
     toParse.body = parseExps(toParse.body);
     return toParse;
-}
-
-function clone_JSON_ARRAY(frame){
-    let i = 0, new_scope = [];
-    while(i < frame.length){
-        new_scope.push(JSON.parse(JSON.stringify(frame[i])));
-        i = i + 1;
-    }
-    return new_scope;
 }
 
 function parseExps(toParse) {
@@ -46,21 +36,9 @@ function parseExps(toParse) {
 
 function parseExp(toParse) {
     var type = toParse.type;
-    return type == 'FunctionDeclaration'  ? func_on_body(toParse, parseExps, false) : parseLoops(toParse);
-}
-
-function parseLoops(toParse){
-    var type = toParse.type;
-    return  type == 'WhileStatement' ? body_cond_loop(toParse) :
-    //type == 'ForStatement' ? body_cond_loop(toParse) :
-        type == 'IfStatement' ? parseIfStatementn(toParse) : toParse;
-}
-
-function value_func_on_body(body_expr, func){
-    if(body_expr.body.type == 'BlockStatement'){
-        return func(body_expr.body.body);
-    }
-    return func([body_expr.body]);
+    return type == 'FunctionDeclaration'  ? func_on_body(toParse, parseExps, false) :
+        type == 'WhileStatement'  ? body_cond_loop(toParse) :
+            type == 'IfStatement' ? parseIfStatementn(toParse) : push_ast_to_node(toParse);
 }
 
 function func_on_body(body_expr, func, rem_brackets_if_one){
@@ -76,24 +54,16 @@ function func_on_body(body_expr, func, rem_brackets_if_one){
 }
 
 function parse_if_else(toParse){
-    if(value_func_on_body(toParse, end_with_ret)){
-        scopes.push(current_scope);
-        current_scope = clone_JSON_ARRAY(current_scope);
-        toParse = func_on_body(toParse, parseExps);
-        current_scope = scopes.pop();
-    }
-    else{
-        scopes.push(vars_in_body); vars_in_body = [];
-        toParse = func_on_body(toParse, find_all_body_assignment_identifiers);
-        if_to_del = if_to_del.concat(vars_in_body); vars_in_body = scopes.pop();
-    }
+    func_on_body(toParse, parseExps);
+    if_json_to_update.push(get_last_cfg());
+    push_new_statement_node(); 
     return pred_infer_check(toParse);
 }
 
 function pred_infer_check(toParse) {
     if (if_add_mode) {
         let if_code = pred_infer_previous_if();
-        if_code.push(esprima.parse(`pred_array.push({line:${line_num},color:'MediumSeaGreen'});`).body[0]);
+        if_code.push(esprima.parse(`pred_array.push({line:${line_num},color:'${green_color}'});`).body[0]);
         if (toParse.body != null & toParse.type == 'BlockStatement') 
         {
             while(if_code.length > 0)
@@ -112,23 +82,26 @@ function pred_infer_previous_if() {
     let i = 0;
     while (i < if_add_mode_last_if_line.length) {
         let curr_line_num = if_add_mode_last_if_line[i++];
-        if_code.push(esprima.parse(`pred_array.push({line:${curr_line_num},color:'Tomato'});`).body[0]);
+        if_code.push(esprima.parse(`pred_array.push({line:${curr_line_num},color:'${red_color}'});`).body[0]);
     }    
     return if_code;
 }
 
-let if_to_del = [];
+let if_json_to_update, if_jsons_stack;
 function parseIfStatementn(toParse) {
     //if not end with ret in body mode else - reg
     if(if_add_mode){
         if_add_mode_last_if_line=[];
         line_num = toParse.test.loc.start.line;
     }
-    toParse.test = find_all_identifiers_and_replace(toParse.test);
-    toParse.consequent = parse_if_else(toParse.consequent);  
+    if_jsons_stack.push(if_json_to_update);
+    push_new_if_node(toParse.test);
+    const if_cfg = get_last_cfg();
+    if_cfg.true = node_key;
+    toParse.consequent = parse_if_else(toParse.consequent);
+    if_cfg.false = node_key-1;//TODO may be out of bounds
     toParse.alternate = parseElseIfStatementRec(toParse.alternate);
-
-    delete_identifiers_from_scope(if_to_del);
+    if_json_to_update = if_jsons_stack.pop();
 
     return toParse;
 }
@@ -137,57 +110,76 @@ function parseIfStatementn(toParse) {
 function parseElseIfStatementRec(toParse) {
     if(toParse != null){
         if(toParse.type == 'IfStatement')  {
-            if(if_add_mode){
-                if_add_mode_last_if_line.push(line_num);
-                line_num = toParse.test.loc.start.line;
-            }
-            toParse.test = find_all_identifiers_and_replace(toParse.test);
-            toParse.consequent = parse_if_else(toParse.consequent);  
+            if(if_add_mode){                if_add_mode_last_if_line.push(line_num);                line_num = toParse.test.loc.start.line;            }
+            push_new_if_node(toParse.test);
+            const if_cfg = get_last_cfg();
+            toParse.consequent = parse_if_else(toParse.consequent);
+            if_cfg.false = node_key-1;//TODO may be out of bounds
             toParse.alternate = parseElseIfStatementRec(toParse.alternate);
         }
         else {
-            if(if_add_mode){
-                if_add_mode_last_if_line.push(line_num);
-                line_num = toParse.loc.start.line-1;
-            }
-            toParse = parse_if_else(toParse);  
-        }    }
+            if(if_add_mode){                if_add_mode_last_if_line.push(line_num);                line_num = toParse.loc.start.line-1;            }
+            toParse = parse_if_else(toParse); 
+            update_if();
+        } 
+    }   else update_if();
     return toParse;
 }
 
+function update_if(){
+    const our_node = node_key-1;
+    while(if_json_to_update.length > 0){
+        if_json_to_update.pop().next = our_node;
+    }
+}
+
 function body_cond_loop(loop_based){
-    loop_based.test = find_all_identifiers_and_replace(loop_based.test);
-
-    loop_based.body = func_on_body(loop_based.body, find_all_body_assignment_identifiers);
-
-    in_body_mode = true; 
-    loop_based.body = func_on_body(loop_based.body, parseExps);
-    in_body_mode = false;
+    push_new_if_node(loop_based.test, true);
+    const cond_loop_cfg = get_last_cfg();
+    func_on_body(loop_based, parseExps); 
+    get_last_cfg().next = cond_loop_cfg.key;   
+    cond_loop_cfg.false = node_key;//TODO may be out of bounds
     
-    vars_in_body = [];
-    loop_based.body = func_on_body(loop_based.body, find_all_body_assignment_identifiers);
-
-    delete_identifiers_from_scope(vars_in_body);
-    if(is_empty_body(loop_based.body)) return -1;
+    if(if_add_mode){
+        line_num = loop_based.test.loc.start.line;
+        const insert = [esprima.parse(`if(pred_array.length == 0 || pred_array.slice(-1)[0].line != ${line_num}){pred_array.push({line:${line_num},color:'${green_color}'})};`).body[0]];
+        if (loop_based.body != null & loop_based.type == 'BlockStatement')  loop_based.body.unshift(insert.pop);    
+        else    {
+            insert.push(loop_based.body);
+            loop_based.body = { type: 'BlockStatement', body: insert};
+        }
+    }
+    
+    push_new_statement_node();
     return loop_based;
 }
 
-function get_cfg(){
-    return cfg;
-}
-
 function push_new_statement_node(){
-    cfg.push({type:'statements', body:[]});
+    cfg.push({key:node_key++, type:'statements', body:[], next: node_key});
 }
 
-function push_new_if_node(ast_test, ast_true, ast_false){
-    cfg.push({type:'decision', test:ast_test, dit:ast_true, dif:ast_false});
+function push_new_if_node(ast_test, while_flag){
+    const last = get_last_cfg();
+    if(last != null && last.body != null && last.body.length == 0)    {
+        cfg.pop();
+        node_key--;
+    }
+    cfg.push({key:node_key++, type:'decision', test:ast_test, true:node_key, false:null, while_flag: while_flag});
 }
 
-function push_to_node(ast){
-    cfg.slice(-1)[0].body.push(ast);
+function push_ast_to_node(ast){
+    let push_to = cfg.slice(-1)[0];
+    if(push_to == null || push_to.type != 'statements')
+        push_new_statement_node();    
+    push_to = cfg.slice(-1)[0].body;
+    if(Array.isArray(ast)){
+        for(let i = 0; i < ast.length; i++)
+            push_to.push(ast[i]);    
+    }
+    else push_to.push(ast);
 }
 
-function pop_last_cfg(){
-    return cfg.pop();
+
+function get_last_cfg(){
+    return cfg.slice(-1)[0];
 }

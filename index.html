@@ -1,6 +1,18 @@
 <!DOCTYPE html>
 <html lang="en">
     <head>
+        <style type="text/css">
+        #myOverviewDiv {
+          position: absolute;
+          width:200px;
+          height:100px;
+          top: 10px;
+          left: 300px;
+          background-color: aliceblue;
+          z-index: 300; /* make sure its in front */
+          border: solid 1px blue;
+        }
+      </style>
         <meta charset="UTF-8">
 
         <style>
@@ -11,7 +23,7 @@
 
             .textAreaWrapper {
                 width: 100%;
-                height: 70vh;
+                height: 80vh;
             }
 
             textarea {
@@ -37,12 +49,13 @@
             <tr>
                 <td>
                     <div class="textAreaWrapper">
-                        <textarea id="codePlaceholder" title="Enter code here"></textarea>
+                        <textarea id="codePlaceholder" title="Enter code here" style="border: solid 1px blue"></textarea>
                     </div>
                 </td>
                 <td>
                     <div class="textAreaWrapper">
-                        <pre id="parsedCode" title="excuted code"></pre>
+                        <div id="myDiagramDiv" title="excuted code" style="height: 750px; border: solid 1px blue"></div>
+                        <div id="myOverviewDiv"></div>
                     </div>
                 </td>
             </tr>
