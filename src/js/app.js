@@ -23,7 +23,7 @@ $(document).ready(function () {
         let source = $('#codePlaceholder').val();
         const esprimed_source = esprima.parse(source, {loc: true});
         let cfg = code_convert_to_cfg(esprimed_source);//get func body
-        //console.log(cfg);
+        console.log(cfg);
         let input = $('#input').val();
         let sol = get_lines(esprimed_source, input);
         if(Array.isArray(sol.result))  sol.result = '[' + sol.result + ']';

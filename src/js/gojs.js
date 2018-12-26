@@ -1,5 +1,5 @@
 import * as go from 'gojs';
-import * as escodegen from 'escodegen';
+import {make_statements, make_links} from './cfg_to_gojs_obj';
 
 var $ = go.GraphObject.make;
 const myDiagram = $(go.Diagram, 'myDiagramDiv',  // must name or refer to the DIV HTML element
@@ -143,7 +143,20 @@ myDiagram.nodeTemplateMap.add('Start',
         makePort('R', go.Spot.Right, go.Spot.Right, true, false),
         makePort('B', go.Spot.Bottom, go.Spot.Bottom, true, false)
     ));
-
+    
+myDiagram.nodeTemplateMap.add('Merge',
+    $(go.Node, 'Table', nodeStyle(),
+        $(go.Panel, 'Auto',
+            $(go.Shape, 'Ellipse',
+                new go.Binding('fill','fill'), 
+                { width: 40, height: 30, fill: '#79C900', strokeWidth: 0 })
+        ),
+        // three named ports, one on each side except the top, all output only:
+        makePort('L', go.Spot.Left, go.Spot.Left, true, false),
+        makePort('R', go.Spot.Right, go.Spot.Right, true, false),
+        makePort('B', go.Spot.Bottom, go.Spot.Bottom, true, false)
+    ));
+    
 myDiagram.nodeTemplateMap.add('End',
     $(go.Node, 'Table', nodeStyle(),
         $(go.Panel, 'Auto',
@@ -249,54 +262,4 @@ export function load(cfg, pred_array) {
         'nodeDataArray': make_statements(cfg, pred_array),
         'linkDataArray': make_links(cfg)};
     myDiagram.model = go.Model.fromJson(toParse);
-}
-
-function make_statements(cfg, pred_array){
-    const out = [{'key':-1, 'category':'Start', 'loc':'175 0', 'text':'Start'}, {'key':-2, 'category':'End', 'loc':'175 660', 'text':'End'}], greens = [], reds = [];
-    let i = 0;    cfg.forEach((node) => {
-        let color = '#022020';
-        if(node.type == 'decision') {
-            color = color_decision(node, color);
-            out.push({'key':i++, 'text':escodegen.generate(node.test), 'category':'Conditional', 'fill' : color});}
-        else{
-            const str = escodegen.generate({type:'BlockStatement',body:node.body});
-            out.push({'key':i++, 'text':str.substr(2,str.length-3), 'fill' : color});}});
-    greens.forEach(color_rest(cfg,out,'true'));    reds.forEach(color_rest(cfg,out,'false'));  color_rest(cfg,out,'')(0);
-    return out;
-    function color_decision(node, color) {
-        if (pred_array.length > 0 && pred_array[0].line == node.test.loc.start.line) {
-            color = pred_array.shift().color;
-            if (color == '#027710') greens.push(i);
-            else    reds.push(i);}
-        else if (node.while_flag != null)    color = '#6B0E01';
-        return color;}
-}
-function color_rest(cfg,out,json_enum) {
-    return function(green){
-        let key;
-        if(json_enum == '') key = green;
-        else key = cfg[green][json_enum];
-        while(cfg[key] != null && cfg[key].type != 'decision') {
-            out[key+2].fill = '#227710';
-            key = cfg[key].next;
-        }
-    };
-}
-
-function make_links(cfg){
-    const out = [{'from':-1, 'to':0, 'fromPort':'B', 'toPort':'T'},
-        {'from':cfg.length-1, 'to':-2, 'fromPort':'B', 'toPort':'T'}];
-    for(let i = 0; i<cfg.length; i++){
-        if(cfg[i].type == 'decision'){
-            out.push({'from':i, 'to':cfg[i].true, 'fromPort':'B', 'toPort':'T', text: 'true', 'category':'ConditionalLink'});
-            if(cfg[i].false != null)
-                out.push({'from':i, 'to':cfg[i].false, 'fromPort':'B', 'toPort':'T', text: 'false', 'category':'ConditionalLink'});
-        }
-        else 
-        if(cfg[i].type == 'statements')
-            out.push({'from':i, 'to':cfg[i].next, 'fromPort':'B', 'toPort':'T'});
-        else out.push({'from':i, 'to':-2, 'fromPort':'B', 'toPort':'T'});
-    }
-    return out;
-
 }
