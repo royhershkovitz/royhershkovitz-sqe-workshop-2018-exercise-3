@@ -9,8 +9,8 @@ function make_statements(cfg, pred_array){
     const color_decision_func = color_decision(pred_array);
     cfg.forEach((node) => {
         parse_node(node,out,i,color_decision_func); i++;});
-    //greens.forEach(color_rest(cfg,out,'true'));    reds.forEach(color_rest(cfg,out,'false'));  color_rest(cfg,out,'')(0);
-    console.log(out);
+    greens.forEach(color_rest(cfg,out,'true'));    reds.forEach(color_rest(cfg,out,'false'));  color_rest(cfg,out,'')(0);
+    //console.log(out);
     return out;
 
     function color_decision(pred_array){
@@ -70,6 +70,6 @@ function make_links(cfg){
         else if(type == 'statements'|type == 'merge')    out.push({'from':i, 'to':cfg[i].next, 'fromPort':'B', 'toPort':'T'});
         else out.push({'from':i, 'to':-2, 'fromPort':'B', 'toPort':'T'});
     }
-    console.log(out);
+    //console.log(out);
     return out;
 }
