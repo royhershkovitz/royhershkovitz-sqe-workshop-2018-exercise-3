@@ -48,7 +48,8 @@ function func_on_body(body_expr, func, rem_brackets_if_one){
     }
     else{
         body_expr = func([body_expr]);//assume if wont give other array
-        if(body_expr.length == 1) body_expr = body_expr[0];
+        //if(body_expr.length == 1)
+        body_expr = body_expr[0];
     }
     return body_expr;
 }
@@ -178,11 +179,12 @@ function push_ast_to_node(ast){
     if(push_to == null || push_to.type != 'statements')
         push_new_statement_node();    
     push_to = cfg.slice(-1)[0].body;
-    if(Array.isArray(ast)){
+    /*if(Array.isArray(ast)){
         for(let i = 0; i < ast.length; i++)
             push_to.push(ast[i]);    
     }
-    else push_to.push(ast);
+    else*/
+    push_to.push(ast);
 }
 
 function push_merge_node(){
