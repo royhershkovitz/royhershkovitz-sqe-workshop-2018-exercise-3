@@ -55,7 +55,9 @@ function func_on_body(body_expr, func, rem_brackets_if_one){
 }
 
 function parse_if_else(toParse){
+    if_jsons_stack.push(line_num);
     toParse = func_on_body(toParse, parseExps);
+    line_num = if_jsons_stack.pop();
     remove_empty_body();
     if_json_to_update.push(get_last_cfg());
     push_new_statement_node(); 
@@ -65,7 +67,8 @@ function parse_if_else(toParse){
 function pred_infer_check(toParse) {
     if (if_add_mode) {
         let if_code = pred_infer_previous_if();
-        if_code.push(esprima.parse(`pred_array.push({line:${line_num},color:'${green_color}'});`).body[0]);
+        if(line_num > -1)
+            if_code.push(esprima.parse(`pred_array.push({line:${line_num},color:'${green_color}'});`).body[0]);
         if (toParse.body != null & toParse.type == 'BlockStatement') 
         {
             while(if_code.length > 0)
@@ -80,8 +83,7 @@ function pred_infer_check(toParse) {
 }
 
 function pred_infer_previous_if() {
-    let if_code = [];
-    let i = 0;
+    let if_code = [], i = 0;
     while (i < if_add_mode_last_if_line.length) {
         let curr_line_num = if_add_mode_last_if_line[i++];
         if_code.push(esprima.parse(`pred_array.push({line:${curr_line_num},color:'${red_color}'});`).body[0]);
@@ -92,11 +94,9 @@ function pred_infer_previous_if() {
 let if_json_to_update, if_jsons_stack;
 function parseIfStatementn(toParse) {
     //if not end with ret in body mode else - reg
-    if(if_add_mode){
-        if_add_mode_last_if_line=[];
-        line_num = toParse.test.loc.start.line;
-    }
     if_jsons_stack.push(if_json_to_update); if_json_to_update=[];
+    if(if_add_mode) 
+        line_num = toParse.test.loc.start.line;    
     push_new_if_node(toParse.test);
     const if_cfg = get_last_cfg();
     if_cfg.true = node_key;
@@ -111,21 +111,23 @@ function parseIfStatementn(toParse) {
 //give the opportunity to parse multiple else if as 'else if statement'
 function parseElseIfStatementRec(toParse) {
     if(toParse != null){
-        if(toParse.type == 'IfStatement')  {
-            if(if_add_mode){ if_add_mode_last_if_line.push(line_num); line_num = toParse.test.loc.start.line; }
-            push_new_if_node(toParse.test);
-            const if_cfg = get_last_cfg();
-            toParse.consequent = parse_if_else(toParse.consequent);
-            if_cfg.false = node_key-1;//TODO may be out of bounds
-            toParse.alternate = parseElseIfStatementRec(toParse.alternate);
-        }
+        if(toParse.type == 'IfStatement')  parse_if();
         else {
-            if(if_add_mode){ if_add_mode_last_if_line.push(line_num); line_num = toParse.loc.start.line-1; }
+            if(if_add_mode){ if_add_mode_last_if_line.push(line_num); line_num = -1; }
             toParse = parse_if_else(toParse,false); 
             update_if();
         } 
+        if(if_add_mode){ if_add_mode_last_if_line.pop(); }
     }   else update_if();
     return toParse;
+    function parse_if(){
+        if(if_add_mode){ if_add_mode_last_if_line.push(line_num); line_num = toParse.test.loc.start.line; }
+        push_new_if_node(toParse.test);
+        const if_cfg = get_last_cfg();
+        toParse.consequent = parse_if_else(toParse.consequent);
+        if_cfg.false = node_key-1;//TODO may be out of bounds
+        toParse.alternate = parseElseIfStatementRec(toParse.alternate);
+    }
 }
 
 function update_if(){
@@ -138,11 +140,10 @@ function update_if(){
 
 function body_cond_loop(loop_based){
     const merge_key = push_merge_node().key;    
-    loop_based.body=func_on_body(loop_based.body, parseExps); 
-    get_last_cfg().next = merge_key;//to defend last statement from if editing
     push_new_if_node(loop_based.test, true); const while_cfg = get_last_cfg();
-    cfg[merge_key].next = while_cfg.key; 
-    while_cfg.false = node_key; while_cfg.true = merge_key+1;
+    loop_based.body=func_on_body(loop_based.body, parseExps); 
+    get_last_cfg().next = merge_key; while_cfg.false = node_key;
+    push_new_statement_node();
     if(if_add_mode){
         line_num = loop_based.test.loc.start.line;
         const insert = [esprima.parse(`if(pred_array.length == 0 || pred_array.slice(-1)[0].line != ${line_num}){pred_array.push({line:${line_num},color:'${green_color}'});};`).body[0]];
@@ -151,8 +152,7 @@ function body_cond_loop(loop_based){
             insert.push(loop_based.body);
             loop_based.body = { type: 'BlockStatement', body: insert};
         }
-    }    
-    push_new_statement_node();
+    }
     return loop_based;
 }
 

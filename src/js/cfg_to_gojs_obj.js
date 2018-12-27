@@ -10,11 +10,11 @@ function make_statements(cfg, pred_array){
     cfg.forEach((node) => {
         parse_node(node,out,i,color_decision_func); i++;});
     greens.forEach(color_rest(cfg,out,'true'));    reds.forEach(color_rest(cfg,out,'false'));  color_rest(cfg,out,'')(0);
-    //console.log(out);
+    //console.log(greens); console.log(reds); //console.log(out);
     return out;
-
     function color_decision(pred_array){
         return function (node, color) {
+            //while(pred_array.length > 0 && pred_array[0].line < node.test.loc.start.line) pred_array.shift();
             if (pred_array.length > 0 && pred_array[0].line == node.test.loc.start.line) {
                 color = pred_array.shift().color;
                 if (color == '#027710') greens.push(i);
@@ -29,30 +29,29 @@ function parse_node(node,out,i, color_decision) {
     let color = '#022020';
     if(node.type == 'decision') {
         color = color_decision(node, color);
-        out.push({'key':i, 'text':global_key++ +'\n'+escodegen.generate(node.test), 'category':'Conditional', 'fill' : color});}
+        out.push({'key':i, 'text':'('+ ++global_key+')\n'+escodegen.generate(node.test), 'category':'Conditional', 'fill' : color});}
     else if(node.type == 'statements') {
         const str = escodegen.generate({type:'BlockStatement',body:node.body});
-        out.push({'key':i, 'text':global_key++ +'\n'+str.substr(2,str.length-3), 'fill' : color});
+        out.push({'key':i, 'text':'('+ ++global_key+')\n'+str.substr(2,str.length-3), 'fill' : color});
     }
     else out.push({'key':i, 'category':'Merge', 'fill' : color});
 }
 
 function color_rest(cfg,out,json_enum) {
     return function(green){
-        let key;
-        if(json_enum == '') key = green;
-        else key = cfg[green][json_enum];
+        let key = json_enum == '' ? green : cfg[green][json_enum];
         let cfgobj = cfg[key];
-        while(cfgobj != null && (cfgobj.type != 'decision' | cfgobj.while_flag)) {
-            if (cfgobj.type == 'decision')  {
-                out[key+2].fill = '#6B0E01';
-                key = cfgobj.false;
-            }
+        while(cfgobj != null && (out[key+2].fill == '#022020'|(cfgobj.type != 'decision' | cfgobj.while_flag))) {
+            if (cfgobj.type == 'decision')  color_while();
             else{
                 out[key+2].fill = '#227710';
                 key = cfgobj.next;
             }
             cfgobj = cfg[key];
+        }
+        function color_while(){
+            if(out[key+2].fill == '#022020') out[key+2].fill = '#6B0E01';
+            key = cfgobj.false;
         }
     };
 }
