@@ -10,12 +10,12 @@ function make_statements(cfg, pred_array){
     cfg.forEach((node) => {
         parse_node(node,out,i,color_decision_func); i++;});
     greens.forEach(color_rest(cfg,out,'true'));    reds.forEach(color_rest(cfg,out,'false'));  color_rest(cfg,out,'')(0);
-    //console.log(greens); console.log(reds); //console.log(out);
+    //console.log(greens); console.log(reds); console.log(JSON.stringify(out));
     return out;
     function color_decision(pred_array){
         return function (node, color) {
             //while(pred_array.length > 0 && pred_array[0].line < node.test.loc.start.line) pred_array.shift();
-            if (pred_array.length > 0 && pred_array[0].line == node.test.loc.start.line) {
+            if (pred_array!=null&&pred_array.length > 0 && pred_array[0].line == node.test.loc.start.line) {
                 color = pred_array.shift().color;
                 if (color == '#027710') greens.push(i);
                 else    reds.push(i);}
@@ -39,7 +39,7 @@ function parse_node(node,out,i, color_decision) {
 
 function color_rest(cfg,out,json_enum) {
     return function(green){
-        let key = json_enum == '' ? green : cfg[green][json_enum];
+        let key = (json_enum === '') ? green : cfg[green][json_enum];
         let cfgobj = cfg[key];
         while(cfgobj != null && (out[key+2].fill == '#022020'|(cfgobj.type != 'decision' | cfgobj.while_flag))) {
             if (cfgobj.type == 'decision')  color_while();
@@ -62,13 +62,13 @@ function make_links(cfg){
     for(let i = 0; i<cfg.length; i++){
         const type = cfg[i].type;
         if(type == 'decision'){
-            if(cfg[i].false != null)
-                out.push({'from':i, 'to':cfg[i].false, 'fromPort':'B', 'toPort':'T', text: 'false', 'category':'ConditionalLink'});
+            //if(cfg[i].false != null)
+            out.push({'from':i, 'to':cfg[i].false,'fromPort':'B', 'toPort':'T', text: 'false','category':'ConditionalLink'});
             out.push({'from':i, 'to':cfg[i].true, 'fromPort':'B', 'toPort':'T', text: 'true', 'category':'ConditionalLink'});
         }
-        else if(type == 'statements'|type == 'merge')    out.push({'from':i, 'to':cfg[i].next, 'fromPort':'B', 'toPort':'T'});
-        else out.push({'from':i, 'to':-2, 'fromPort':'B', 'toPort':'T'});
+        else//if(type == 'statements'|type == 'merge')    
+            out.push({'from':i, 'to':cfg[i].next, 'fromPort':'B', 'toPort':'T'});
     }
-    //console.log(out);
+    //console.log(JSON.stringify(out));
     return out;
 }

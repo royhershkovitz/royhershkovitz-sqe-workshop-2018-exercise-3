@@ -43,9 +43,9 @@ describe('The javascript cfg creator', () => {
                 return c;
             }`,
             `[{"key": 0, "type": "statements", "next": 1},
-             {"key": 1, "type": "merge", "next": 3},
-             {"key": 2, "type": "statements", "next": 1},
-             {"key": 3, "type": "decision", "true": 2, "false": 4},
+             {"key": 1, "type": "merge", "next": 2},
+             {"key": 2, "type": "decision", "true": 3, "false": 4},
+             {"key": 3, "type": "statements", "next": 1},
              {"key": 4, "type": "statements", "next": 5}]`);
     });
 
@@ -94,15 +94,15 @@ describe('The javascript cfg creator', () => {
                 return c;
             }`,            
             `[{"key": 0, "type": "statements", "next": 1},
-            {"key": 1, "type": "decision", "true": 2, "false": 5},
-            {"key": 2, "type": "merge", "next": 4},
-            {"key": 3, "type": "statements", "next": 2},
-            {"key": 4, "type": "decision", "true": 3, "false": 5},
-            {"key": 5, "type": "decision", "true": 6, "false": 7},
-            {"key": 6, "type": "statements", "next": 8},
-            {"key": 7, "type": "statements", "next": 8},
-            {"key": 8, "type": "merge", "next": 9},
-            {"key": 9, "type": "statements", "next": 10}]`);
+              {"key": 1, "type": "decision", "true": 2, "false": 5},
+              {"key": 2, "type": "merge", "next": 3},
+              {"key": 3, "type": "decision", "true": 4, "false": 5},
+              {"key": 4, "type": "statements", "next": 8},
+              {"key": 5, "type": "decision", "true": 6, "false": 7},
+              {"key": 6, "type": "statements", "next": 8},
+              {"key": 7, "type": "statements", "next": 8},
+              {"key": 8, "type": "merge", "next": 9},
+              {"key": 9, "type": "statements", "next": 10}]`);
     });
 });
 
@@ -151,7 +151,6 @@ describe('The javascript predicate inferior', () => {
                 } 
                 else {
                     pred_array.push({line:3,color:'${red_color}'});
-                    pred_array.push({line:4,color:'${green_color}'});
                     v = 1;
                 }                
                 return -v;
@@ -189,7 +188,6 @@ describe('The javascript predicate inferior', () => {
                 else {
                     pred_array.push({line:3,color:'${red_color}'});
                     pred_array.push({line:5,color:'${red_color}'});
-                    pred_array.push({line:8,color:'${green_color}'});
                     v = 2;
                 }              
                 return -v;
