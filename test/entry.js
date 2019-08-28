@@ -1,1 +1,1 @@
-import './symbolic_substitution.test';
+import './cfg_converter.test';

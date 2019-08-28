@@ -20,14 +20,13 @@ function get_lines(parsedCode, input){
 
 $(document).ready(function () {
     $('#codeSubmissionButton').click(() => {
-        let source = $('#codePlaceholder').val();
-        const esprimed_source = esprima.parse(source, {loc: true});
-        let cfg = code_convert_to_cfg(esprimed_source);//get func body
+        const esprimed_source = esprima.parse($('#codePlaceholder').val(), {loc: true});
+        const cfg = code_convert_to_cfg(esprimed_source);//get func body
         //console.log(cfg);
-        let input = $('#input').val();
-        let sol = get_lines(esprimed_source, input);
+        const sol = get_lines(esprimed_source, $('#input').val());
+        //console.log(sol.lines.slice(0));//pred_infer
         if(Array.isArray(sol.result))  sol.result = '[' + sol.result + ']';
-        document.getElementById('output').innerHTML = sol.result;     
+        document.getElementById('output').innerHTML = sol.result;
         go.load(cfg,sol.lines);
     });
 });
