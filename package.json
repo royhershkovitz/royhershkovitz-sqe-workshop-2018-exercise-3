@@ -21,21 +21,21 @@
     "author": "",
     "license": "ISC",
     "dependencies": {
-        "gojs": "^v1.8.35",
-        "escodegen": "^1.11.0",
-        "esprima": "^4.0.0",
-        "jquery": "^3.3.1",
-        "safe-eval": "^0.4.1"
+        "gojs": "*",
+        "escodegen": "*",
+        "esprima": "*",
+        "jquery": "*",
+        "safe-eval": "*"
     },
     "devDependencies": {
-        "cross-env": "^5.2.0",
-        "eslint": "^5.10.0",
-        "istanbul-instrumenter-loader": "^3.0.1",
-        "mocha": "^5.2.0",
-        "mocha-webpack": "^2.0.0-beta.0",
-        "nyc": "^12.0.2",
-        "safe-eval": "^0.4.1",
-        "webpack": "^4.12.2",
-        "webpack-cli": "^2.1.4"
+        "cross-env": "*",
+        "eslint": "*",
+        "istanbul-instrumenter-loader": "*",
+        "mocha": "*",
+        "mocha-webpack": "*",
+        "nyc": "*",
+        "safe-eval": "*",
+        "webpack": "*",
+        "webpack-cli": "*"
     }
 }
